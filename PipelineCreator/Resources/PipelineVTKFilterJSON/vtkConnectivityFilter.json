@@ -1,0 +1,15 @@
+{
+  "name": "vtkConnectivityFilter",
+  "inputType": "vtkMRMLModelNode",
+  "outputType": "vtkMRMLModelNode",
+  "parameters": [
+    {
+      "name": "ExtractionMode",
+      "type": "enum",
+      "values": [
+        "Largest Region",
+        "All Regions"
+      ]
+    }
+  ]
+}
