@@ -1,4 +1,5 @@
 import slicer
+from PipelineCreator import slicerPipeline
 from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameter, IntegerParameter
 from SurfaceToolbox import SurfaceToolboxLogic
 
@@ -44,6 +45,7 @@ class SurfaceToolboxBase(object):
 
 
 ###############################################################################
+@slicerPipeline
 class Decimation(SurfaceToolboxBase):
   def __init__(self):
     SurfaceToolboxBase.__init__(self)
@@ -72,6 +74,7 @@ class Decimation(SurfaceToolboxBase):
     return self.parameterNode.GetParameter("decimationBoundaryDeletion").lower() == "true"
 
 ###############################################################################
+@slicerPipeline
 class ScaleMesh(SurfaceToolboxBase):
   def __init__(self):
     SurfaceToolboxBase.__init__(self)
@@ -103,6 +106,7 @@ class ScaleMesh(SurfaceToolboxBase):
     return float(self.parameterNode.GetParameter("scaleZ"))
 
 ###############################################################################
+@slicerPipeline
 class Smoothing(SurfaceToolboxBase):
   def __init__(self):
     SurfaceToolboxBase.__init__(self)
@@ -146,6 +150,7 @@ class Smoothing(SurfaceToolboxBase):
     return self.parameterNode.GetParameter("smoothingBoundarySmoothing") == "true"
 
 ###############################################################################
+@slicerPipeline
 class Cleaner(SurfaceToolboxBase):
   def __init__(self):
     SurfaceToolboxBase.__init__(self)
@@ -162,10 +167,3 @@ class Cleaner(SurfaceToolboxBase):
   def Run(self, input):
     print("Running "+ self.GetName())
     return input
-
-###############################################################################
-def RegisterPipelineModules(pipelineCreatorLogic):
-  pipelineCreatorLogic.registerModule(Decimation())
-  pipelineCreatorLogic.registerModule(ScaleMesh())
-  pipelineCreatorLogic.registerModule(Smoothing())
-  pipelineCreatorLogic.registerModule(Cleaner())
