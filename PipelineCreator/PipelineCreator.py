@@ -6,6 +6,7 @@ import pickle
 import shutil
 import textwrap
 import threading
+from string import Template
 
 import ctk
 import qt
@@ -14,10 +15,25 @@ import vtk
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 
-from _PipelineCreator.ModuleTemplate import ModuleTemplate
-from _PipelineCreator.SelectableModules import (SurfaceToolboxWrapping,
-                                                vtkFilterJSONReader)
 from Widgets.SelectModulePopUp import SelectModulePopUp
+
+#
+# ModuleTemplate
+#
+class ModuleTemplate(Template):
+  """
+  Custom template class with special syntax
+  because CMake's variable syntax is the same
+  as the default Template's replace syntax
+  """
+  delimiter = '{{'
+  # only really want braced, but need both groups "named" and "braced" to exist
+  pattern = r"""\{\{(?:
+    (?P<escaped>\{) |
+    (?P<named>[_a-z][_a-z0-9]*)}} |
+    (?P<braced>[_a-z][_a-z0-9]*)}} |
+    (?P<invalid>)
+  )"""
 
 #
 # PipelineCreator
@@ -464,15 +480,6 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     if useSingleton:
       self._allModules = PipelineCreatorLogic._allModules
       self.isSingletonParameterNode = True
-      # try:
-      #   PipelineCreatorLogic._defaultModulesLock.acquire()
-      #   if not PipelineCreatorLogic._defaultModulesLoaded:
-      #     PipelineCreatorLogic._defaultModulesLoaded = True
-      #     # Doing a lazy load of the modules the first time a logic is instantiated
-      #     # It is required t
-      #     self.loadDefaultModules()
-      # finally:
-      #   PipelineCreatorLogic._defaultModulesLock.release()
     else:
       self._allModules = {}
       self.isSingletonParameterNode = False
@@ -486,10 +493,6 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     """
     #TODO: Implement this
     pass
-
-  def loadDefaultModules(self):
-    SurfaceToolboxWrapping.RegisterPipelineModules(self)
-    vtkFilterJSONReader.RegisterPipelineModules(self, self.resourcePath('PipelineVTKFilterJSON'))
 
   def resourcePath(self, filename):
     scriptedModulesPath = os.path.dirname(slicer.util.modulePath(self.moduleName))
@@ -782,11 +785,14 @@ def CallAfterPipelineCreatorLoaded(callback):
 
 def SingletonRegisterModule(module):
   """
-  Recommended method to use to register a module with the PipelineCreator.
   This method will handle correctly registering the module regardless of if
   the pipeline creator has already been loaded into slicer when it is called
   """
   CallAfterPipelineCreatorLoaded(lambda: PipelineCreatorLogic().registerModule(module))
 
-# Load the default modules into the singleton logic when we can
-CallAfterPipelineCreatorLoaded(lambda: PipelineCreatorLogic().loadDefaultModules())
+def slicerPipeline(classVar):
+  """
+  Class decorator to automatically register a class with the pipeline creator
+  """
+  SingletonRegisterModule(classVar())
+  return classVar

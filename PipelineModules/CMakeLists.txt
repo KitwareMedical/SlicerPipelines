@@ -1,20 +1,20 @@
 #-----------------------------------------------------------------------------
-set(MODULE_NAME PipelineCreator)
+set(MODULE_NAME PipelineModules)
 
 #-----------------------------------------------------------------------------
 set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
-  Widgets/SelectModulePopUp.py
+  PipelineModulesLib/PipelineParameters.py
+  PipelineModulesLib/SurfaceToolboxWrapping.py
+  PipelineModulesLib/vtkFilterJSONReader.py
   )
 
 set(MODULE_PYTHON_RESOURCES
   Resources/Icons/${MODULE_NAME}.png
   Resources/UI/${MODULE_NAME}.ui
 
-  Resources/PipelineTemplateModule/CMakeLists.txt.template
-  Resources/PipelineTemplateModule/XXX.py.template
-  Resources/PipelineTemplateModule/Resources/Icons/XXX.png
-  Resources/PipelineTemplateModule/Resources/UI/XXX.ui
+  Resources/PipelineVTKFilterJSON/vtkConnectivityFilter.json
+  Resources/PipelineVTKFilterJSON/vtkFillHolesFilter.json
   )
 
 #-----------------------------------------------------------------------------
