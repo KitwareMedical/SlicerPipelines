@@ -417,22 +417,44 @@ class _ModuleHolder:
 
   @property
   def name(self):
-    return self._module.GetName()
+    try:
+      return self._module.GetName()
+    except TypeError:
+      return self._module().GetName()
 
   @property
   def inputType(self):
-    return self._module.GetInputType()
+    try:
+      return self._module.GetInputType()
+    except TypeError:
+      return self._module().GetInputType()
 
   @property
   def outputType(self):
-    return self._module.GetOutputType()
+    try:
+      return self._module.GetOutputType()
+    except TypeError:
+      return self._module().GetOutputType()
 
   @property
-  def module(self):
-    return self._module
+  def dependencies(self):
+    try:
+      return self._module.GetDependencies()
+    except TypeError:
+      return self._module().GetDependencies()
+
+  @property
+  def moduleClass(self):
+    return self._module if inspect.isclass(self._module) else self._module.__class__
+
+  def moduleInstance(self):
+    return self._module if not inspect.isclass(self._module) else self._module()
 
   def MakeParameters(self):
-    return self._module.GetParameters()
+    try:
+      return self._module.GetParameters()
+    except TypeError:
+      return self._module().GetParameters()
 
   def updateParameterNodeFromSelf(self, param):
     param.SetParameter('name', self.name)
@@ -557,11 +579,17 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     if errorStr:
       raise Exception("Error creating pipeline: \n" + errorStr)
 
+    deps = ['PipelineCreator']
+    for moduleName, _ in modules:
+      module = self.moduleFromName(moduleName)
+      deps += module.dependencies
+    deps = sorted(list(set(deps))) # Remove duplicates
+
     replacements = {
       "MODULE_NAME": pipelineName,
       "MODULE_CATEGORIES": "['PipelineModules']", #TODO implement custom
       "MODULE_RUN_METHOD": self._createRunMethod(modules),
-      "MODULE_DEPENDENCIES": "['PipelineCreator']", #TODO auto populate this
+      "MODULE_DEPENDENCIES": str(deps),
       "MODULE_CONTRIBUTORS": "['PipelineCreator']", #TODO implement custom?
       "MODULE_SETUP_PIPELINE_UI_METHOD": self._createSetupPipelineUIMethod(modules),
       "MODULE_UPDATE_GUI_FROM_PARAMETER_NODE": "", #TODO implement as part of non-fixed parameters
@@ -599,10 +627,9 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     for moduleName, parameters in modules:
       moduleHolder = self.moduleFromName(moduleName)
       #the register doesn't really care if it gets a class or an instance, so handle both cases
-      actualClass = moduleHolder.module if inspect.isclass(moduleHolder.module) else moduleHolder.module.__class__
-      methodText += "  # {stringClass}\n".format(stringClass=str(actualClass))
+      methodText += "  # {stringClass}\n".format(stringClass=str(moduleHolder.moduleClass))
       methodText += "  nextPipelinePiece = pickle.loads({pickledClass})()\n".format(
-          pickledClass=pickle.dumps(actualClass),
+          pickledClass=pickle.dumps(moduleHolder.moduleClass),
         )
 
       for parameterName, parameterValue in parameters.items():
@@ -768,33 +795,39 @@ class PipelineCreatorTest(ScriptedLoadableModuleTest):
 
     #TODO create tests
 
-
-
-def CallAfterPipelineCreatorLoaded(callback):
-  """
-  Calls method after the pipeline creator is loaded. Is called right away
-  if the pipeline creator is already loaded.
-  """
-  try:
-    slicer.modules.pipelinecreator #this will throw if pipelinecreator has not been loaded yet
+def CallAfterAllTheseModulesLoaded(callback, modules):
+  #if all modules are loaded
+  if not set(modules).difference(set(slicer.app.moduleManager().modulesNames())):
     callback()
-  except AttributeError:
-    #we haven't loaded pipelinecreator yet, so register this when we do
-    def callbackWrapper(moduleName):
-      if "PipelineCreator" == moduleName:
+  else:
+    def callbackWrapper():
+      if not set(modules).difference(set(slicer.app.moduleManager().modulesNames())):
         callback()
+        slicer.app.moduleManager().moduleLoaded.disconnect(callbackWrapper)
     slicer.app.moduleManager().moduleLoaded.connect(callbackWrapper)
 
-def SingletonRegisterModule(module):
+def SingletonRegisterModule(module, moduleDependencies = None):
   """
   This method will handle correctly registering the module regardless of if
   the pipeline creator has already been loaded into slicer when it is called
   """
-  CallAfterPipelineCreatorLoaded(lambda: PipelineCreatorLogic().registerModule(module))
+  def register():
+    try:
+      PipelineCreatorLogic().registerModule(module)
+    except TypeError:
+      PipelineCreatorLogic().registerModule(module())
+  dependencies = moduleDependencies or []
+  dependencies.append('PipelineCreator')
+  CallAfterAllTheseModulesLoaded(register, dependencies)
 
 def slicerPipeline(classVar):
   """
   Class decorator to automatically register a class with the pipeline creator
   """
-  SingletonRegisterModule(classVar())
+  try:
+    dependencies = classVar.GetDependencies()
+  except AttributeError:
+    dependencies = []
+
+  SingletonRegisterModule(classVar, dependencies)
   return classVar

@@ -13,7 +13,8 @@ class SurfaceToolboxBase(object):
 
     self.verboseRun = False
 
-  def GetDependencies(self):
+  @staticmethod
+  def GetDependencies():
     return ['SurfaceToolbox']
 
   @property
