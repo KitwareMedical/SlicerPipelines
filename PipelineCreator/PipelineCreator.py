@@ -1,3 +1,4 @@
+import collections
 import copy
 import inspect
 import keyword
@@ -113,6 +114,11 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
     self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
 
+    self.ui.cboxTestInput.setMRMLScene(slicer.mrmlScene)
+    self.ui.cboxTestOutput.setMRMLScene(slicer.mrmlScene)
+    self.ui.cboxTestInput.enabled = False
+    self.ui.cboxTestOutput.enabled = False
+
     # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene
     # (in the selected parameter node).
     self.ui.leModuleName.textChanged.connect(self.updateParameterNodeFromGUI)
@@ -120,6 +126,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.btnFinalize.clicked.connect(self._onFinalize)
     self.ui.btnClear.clicked.connect(self._onClear)
     self.ui.btnBrowseOutputDirectory.clicked.connect(self._onBrowseOutputDirectory)
+    self.ui.btnRun.clicked.connect(self._onRun)
 
     #insert first insert button
     self._moduleUiStartIndex = self.uiLayout.count() - 1 # - 1 because we want to keep the vertical spacer as the last item
@@ -159,15 +166,19 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         buttonHolder.cbutton.hide()
         self.uiLayout.removeWidget(buttonHolder.cbutton)
       self._moduleButtons.clear()
+      self._modulesChanged()
 
-  def _onFinalize(self):
-    try:
-      modules = [
+  def _convertModuleButtonsToLogicInput(self):
+    return [
         (b.module.name, {
           paramName: param.GetValue() for paramName, param in b.parameters #TODO if param is fixed
         }) for b in self._moduleButtons
       ]
 
+
+  def _onFinalize(self):
+    try:
+      modules = self._convertModuleButtonsToLogicInput()
       moduleName = self.ui.leModuleName.text
       outputDirectory = self.ui.leOutputDirectory.text
       self.logic.createPipeline(moduleName, outputDirectory, modules)
@@ -181,6 +192,35 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       msgbox.setText(str(e))
       msgbox.exec()
 
+  def _onRun(self):
+    modules = self._convertModuleButtonsToLogicInput()
+    inputNode = self.ui.cboxTestInput.currentNode()
+    actualOutputNode = self.logic.runPipeline(modules, inputNode)
+
+    desiredOutputNode = self.ui.cboxTestOutput.currentNode()
+    if desiredOutputNode is not None:
+      # copy into node, but keep name
+      name = desiredOutputNode.GetName()
+      desiredOutputNode.Copy(actualOutputNode)
+      desiredOutputNode.SetName(name)
+    slicer.mrmlScene.RemoveNode(actualOutputNode)
+    if not desiredOutputNode.GetDisplayNode():
+      desiredOutputNode.CreateDefaultDisplayNodes()
+
+    inputNode.GetDisplayNode().SetVisibility(False)
+    desiredOutputNode.GetDisplayNode().SetVisibility(True)
+
+  def _modulesChanged(self):
+    testable = self._verifyInputOutputFlow() and self._moduleButtons
+    if testable:
+      self.ui.cboxTestInput.nodeTypes = (self._moduleButtons[0].module.inputType, )
+      self.ui.cboxTestOutput.nodeTypes = (self._moduleButtons[-1].module.outputType, )
+    else:
+      self.ui.cboxTestInput.nodeTypes = ()
+      self.ui.cboxTestOutput.nodeTypes = ()
+    self.ui.cboxTestInput.enabled = testable
+    self.ui.cboxTestOutput.enabled = testable
+    self.ui.btnRun.enabled = testable
 
   def _verifyInputOutputFlow(self):
     #update overall input/output
@@ -195,6 +235,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     badPalette = qt.QPalette()
     badPalette.setColor(qt.QPalette.Base, qt.QColor(255, 128, 128))
 
+    good = True
     for index, curButtonHolder in enumerate(self._moduleButtons):
       curModule = curButtonHolder.module
       if index == 0:
@@ -205,12 +246,14 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         if curModule.inputType != prevModule.outputType:
           curButtonHolder.inputTypeLineEdit.setPalette(badPalette)
           prevButtonHolder.outputTypeLineEdit.setPalette(badPalette)
+          good = False
         else:
           curButtonHolder.inputTypeLineEdit.setPalette(defaultPalette)
           prevButtonHolder.outputTypeLineEdit.setPalette(defaultPalette)
 
       if index == len(self._moduleButtons) - 1:
         curButtonHolder.outputTypeLineEdit.setPalette(defaultPalette)
+    return good
 
   def _onDeleteModule(self, buttonHolder):
     q = qt.QMessageBox()
@@ -223,7 +266,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       buttonHolder.cbutton.hide()
       self.uiLayout.removeWidget(buttonHolder.cbutton)
       self._moduleButtons.remove(buttonHolder)
-      self._verifyInputOutputFlow()
+      self._modulesChanged()
 
   def _onModuleMoveUp(self, buttonHolder):
     self._onModuleMove(buttonHolder, -1)
@@ -240,7 +283,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       self.uiLayout.removeWidget(buttonHolder.cbutton)
       self.uiLayout.insertWidget(self._moduleUiStartIndex + index + movement, buttonHolder.cbutton)
       buttonHolder.cbutton.show()
-      self._verifyInputOutputFlow()
+      self._modulesChanged()
 
   def _onInsertModuleButton(self, listIndex):
     popUp = SelectModulePopUp(self.logic.allModules, None, self.uiWidget)
@@ -308,7 +351,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       self._moduleButtons.insert(index, buttonHolder)
       self.uiLayout.insertWidget(self._moduleUiStartIndex + index, cbutton)
 
-      self._verifyInputOutputFlow()
+      self._modulesChanged()
     except Exception as e:
           print ("Exception trying add module: '%s' for module '%s'\n    %s"
             % (name, module.name, str(e)))
@@ -539,6 +582,20 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     else:
       self._allModules.append(_ModuleHolder(module))
 
+  def runPipeline(self, modules, inputNode):
+    """
+    modules is [(moduleName, {module-parameter-name: module-parameter-value})]
+     List of tuples. Each tuple is the module name and a dictionary of fixed parameters.
+     Not all of the modules parameters need to be fixed.
+    """
+    runMethodAsString = self._createRunMethod(modules)
+    localsDict = {}
+    exec(runMethodAsString, globals(), localsDict)
+
+    fakeModule = collections.namedtuple("FakeModule", "deleteIntermediates")
+    fakeSelf = fakeModule(deleteIntermediates=True)
+    return localsDict["Run"](fakeSelf, inputNode)
+
   def createPipeline(self, pipelineName, outputDirectory, modules):
     """
     modules is [(moduleName, {module-parameter-name: module-parameter-value})]
@@ -622,8 +679,8 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     return newName
 
   def _createRunMethod(self, modules):
-    methodText = "def Run(self, input):\n" + \
-                 "  nodes = [input]\n"
+    methodText = "def Run(self, inputNode):\n" + \
+                 "  nodes = [inputNode]\n"
     for moduleName, parameters in modules:
       moduleHolder = self.moduleFromName(moduleName)
       #the register doesn't really care if it gets a class or an instance, so handle both cases
