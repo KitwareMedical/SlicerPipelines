@@ -6,7 +6,7 @@ class IntegerParameter(object):
   PipelineCreator's needs that has a UI of both a slider and a spinbox
   in a horizontal layout.
   """
-  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None):
+  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None, suffix=None):
     self._hlayout = qt.QHBoxLayout()
     self._slider = qt.QSlider(qt.Qt.Horizontal)
     self._spinbox = qt.QSpinBox()
@@ -22,6 +22,8 @@ class IntegerParameter(object):
     if value is not None:
       self._spinbox.value = value
       self._slider.value = value
+    if suffix is not None:
+      self._spinbox.suffix = suffix
 
     self._spinbox.valueChanged.connect(self._onSpinboxChanged)
     self._slider.valueChanged.connect(self._onSliderChanged)
@@ -47,7 +49,7 @@ class FloatParameter(object):
   PipelineCreator's needs that has a UI of both a slider and a spinbox
   in a horizontal layout.
   """
-  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None, decimals=2):
+  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None, decimals=2, suffix=None):
     self._hlayout = qt.QHBoxLayout()
     self._slider = qt.QSlider(qt.Qt.Horizontal)
     self._spinbox = qt.QDoubleSpinBox()
@@ -64,6 +66,8 @@ class FloatParameter(object):
     if value is not None:
       self._spinbox.value = value
       self._slider.value = value * self._sliderMultiplier
+    if suffix is not None:
+      self._spinbox.suffix = suffix
 
     self._spinbox.valueChanged.connect(self._onSpinboxChanged)
     self._slider.valueChanged.connect(self._onSliderChanged)
