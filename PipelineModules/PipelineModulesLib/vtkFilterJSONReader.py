@@ -12,6 +12,10 @@ def _fixUpParameterName(parameterName):
       raise Exception("Invalid name: '%s'" % newName)
   return newName
 
+def _boolParamUI(param):
+  return BooleanParameter(
+    defaultValue=param.get('value', False))
+
 def _doubleParamUI(param):
   return FloatParameterWithSlider(
     value=param.get('value', None),
@@ -25,8 +29,7 @@ def _integerParamUI(param):
     value=param.get('value', None),
     minimum=param.get('minimum', None),
     maximum=param.get('maximum', None),
-    singleStep=param.get('singleStep', None),
-    decimals=param.get('decimals', None))
+    singleStep=param.get('singleStep', None))
 
 def _enumParamUI(param):
   return StringComboBoxParameter(param['values'])
@@ -39,6 +42,8 @@ def _createParamUI(param):
     return _integerParamUI(param)
   elif paramType in ("enum"):
     return _enumParamUI(param)
+  elif paramType in ("bool", "boolean"):
+    return _boolParamUI(param)
   raise Exception("Error loading vtk filter json: Unknown parameter type '%s'" % paramType)
 
 def _passThroughSetMethod(param):
@@ -63,6 +68,8 @@ def _createParamSetMethod(param):
     return _passThroughSetMethod(param)
   elif paramType in ("enum"):
     return _enumParamSetMethod(param)
+  elif paramType in ("bool", "boolean"):
+    return _passThroughSetMethod(param)
   raise Exception("Error loading vtk filter json: Unknown parameter type '%s'" % paramType)
 
 # Having the creation of the class in its own function is very important to

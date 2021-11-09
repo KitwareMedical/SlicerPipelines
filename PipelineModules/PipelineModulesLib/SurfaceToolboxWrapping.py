@@ -43,37 +43,6 @@ class SurfaceToolboxBase(object):
 
     return outputModel
 
-
-###############################################################################
-@slicerPipeline
-class Decimation(SurfaceToolboxBase):
-  def __init__(self):
-    SurfaceToolboxBase.__init__(self)
-    self.parameterNode.SetParameter("decimation", "true")
-
-  @staticmethod
-  def GetName():
-    return "SurfaceToolbox.Decimation"
-
-  @staticmethod
-  def GetParameters():
-    return [
-      ('Reduction', FloatParameterWithSlider(value=0.8, minimum=0.0, maximum=1.0, singleStep=0.01)),
-      ('Boundary Deletion', BooleanParameter(True)),
-    ]
-
-  def SetReduction(self, reduction):
-    self.parameterNode.SetParameter("decimationReduction", str(reduction))
-
-  def GetReduction(self):
-    return float(self.parameterNode.GetParameter("decimationReduction"))
-
-  def SetBoundaryDeletion(self, boundaryDeletion):
-    self.parameterNode.SetParameter("decimationBoundaryDeletion", str(boundaryDeletion).lower())
-
-  def GetBoundaryDeletion(self):
-    return self.parameterNode.GetParameter("decimationBoundaryDeletion").lower() == "true"
-
 ###############################################################################
 @slicerPipeline
 class ScaleMesh(SurfaceToolboxBase):
@@ -108,63 +77,32 @@ class ScaleMesh(SurfaceToolboxBase):
 
 ###############################################################################
 @slicerPipeline
-class Smoothing(SurfaceToolboxBase):
+class TranslateMesh(SurfaceToolboxBase):
   def __init__(self):
     SurfaceToolboxBase.__init__(self)
-    self.parameterNode.SetParameter("smoothing", "true")
+    self.parameterNode.SetParameter("translate", "true")
 
   @staticmethod
   def GetName():
-    return "SurfaceToolbox.Smoothing"
+    return "SurfaceToolbox.TranslateMesh"
 
   @staticmethod
   def GetParameters():
     return [
-      ('Method', StringComboBoxParameter(['Laplace', 'Taubin'])),
-      ('Iterations', IntegerParameterWithSlider(value=100, minimum=0, maximum=500, singleStep=1)),
-      ('Relaxation', FloatParameterWithSlider(value=0.5, minimum=0.0, maximum=1.0, singleStep=0.1)),
-      ('Boundary Smoothing', BooleanParameter(True)),
+      ('TranslateX', FloatParameterWithSlider(value=0.5, minimum=-100.0, maximum=100.0, singleStep=0.01)),
+      ('TranslateY', FloatParameterWithSlider(value=0.5, minimum=-100.0, maximum=100.0, singleStep=0.01)),
+      ('TranslateZ', FloatParameterWithSlider(value=0.5, minimum=-100.0, maximum=100.0, singleStep=0.01)),
     ]
 
-  def SetMethod(self, method):
-    self.parameterNode.SetParameter("smoothingMethod", method)
-  def GetMethod(self):
-    return self.parameterNode.GetParameter("smoothingMethod")
-
-  def SetIterations(self, iterations):
-    self.parameterNode.SetParameter("smoothingLaplaceIterations", str(iterations))
-    self.parameterNode.SetParameter("smoothingTaubinIterations", str(iterations))
-  def GetIterations(self):
-    if self.GetMethod() == "Laplace":
-      return int(self.parameterNode.GetParameter("smoothingLaplaceIterations"))
-    else:
-      return int(self.parameterNode.GetParameter("smoothingTaubinIterations"))
-
-  def SetRelaxation(self, relaxation):
-    self.parameterNode.SetParameter("smoothingLaplaceRelaxation", str(relaxation))
-  def GetRelaxation(self):
-    return float(self.parameterNode.GetParameter("smoothingLaplaceRelaxation"))
-
-  def SetBoundarySmoothing(self, boundarySmoothing):
-    self.parameterNode.SetParameter("smoothingBoundarySmoothing", "true" if boundarySmoothing else "false")
-  def GetBoundarySmoothing(self):
-    return self.parameterNode.GetParameter("smoothingBoundarySmoothing") == "true"
-
-###############################################################################
-@slicerPipeline
-class Cleaner(SurfaceToolboxBase):
-  def __init__(self):
-    SurfaceToolboxBase.__init__(self)
-    self.parameterNode.SetParameter("clean", "true")
-
-  @staticmethod
-  def GetName():
-    return "SurfaceToolbox.Cleaner"
-
-  @staticmethod
-  def GetParameters():
-    return []
-
-  def Run(self, input):
-    print("Running "+ self.GetName())
-    return input
+  def SetTranslateX(self, translate):
+    self.parameterNode.SetParameter("translateX", str(translate))
+  def GetTranslateX(self):
+    return float(self.parameterNode.GetParameter("translateX"))
+  def SetTranslateY(self, translate):
+    self.parameterNode.SetParameter("translateY", str(translate))
+  def GetTranslateY(self):
+    return float(self.parameterNode.GetParameter("translateY"))
+  def SetTranslateZ(self, translate):
+    self.parameterNode.SetParameter("translateZ", str(translate))
+  def GetTranslateZ(self):
+    return float(self.parameterNode.GetParameter("translateZ"))

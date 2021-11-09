@@ -15,8 +15,14 @@ set(MODULE_PYTHON_RESOURCES
   Resources/Icons/${MODULE_NAME}.png
   Resources/UI/${MODULE_NAME}.ui
 
+  Resources/PipelineVTKFilterJSON/vtkCleanPolyData.json
   Resources/PipelineVTKFilterJSON/vtkConnectivityFilter.json
+  Resources/PipelineVTKFilterJSON/vtkDecimatePro.json
   Resources/PipelineVTKFilterJSON/vtkFillHolesFilter.json
+  Resources/PipelineVTKFilterJSON/vtkPolyDataNormals.json
+  Resources/PipelineVTKFilterJSON/vtkQuadricDecimation.json
+  Resources/PipelineVTKFilterJSON/vtkSmoothPolyDataFilter.json
+  Resources/PipelineVTKFilterJSON/vtkWindowedSincPolyDataFilter.json
   )
 
 #-----------------------------------------------------------------------------

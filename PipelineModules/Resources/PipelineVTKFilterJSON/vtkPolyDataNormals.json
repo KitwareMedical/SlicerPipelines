@@ -1,0 +1,51 @@
+{
+  "name": "vtkPolyDataNormals",
+  "inputType": "vtkMRMLModelNode",
+  "outputType": "vtkMRMLModelNode",
+  "parameters": [
+    {
+      "name": "AutoOrientNormals",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "Splitting",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "Consistency",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "ComputePointNormals",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "ComputeCellNormals",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "FlipNormals",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "NonManifoldTraversal",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "FeatureAngle",
+      "type": "double",
+      "minimum": 0.0,
+      "value": 30.0,
+      "maximum": 180.0,
+      "singleStep": 0.1,
+      "decimals": 1
+    }
+  ]
+}
