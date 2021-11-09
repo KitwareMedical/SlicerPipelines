@@ -155,6 +155,41 @@ class HollowEffect(SegmentEditorBase):
     self._effect.setParameter("ShellMode", HollowEffect._optionsConverter[option])
 
 ###############################################################################
+@slicerPipeline
+class IslandsEffect(SegmentEditorBase):
+  EffectName = 'Islands'
+  _operationsConverter = {
+    'Keep largest island': SegmentEditorEffects.KEEP_LARGEST_ISLAND,
+    'Remove small islands': SegmentEditorEffects.REMOVE_SMALL_ISLANDS,
+  }
+  DefaultOperation = list(_operationsConverter.keys())[0]
+  MaximumNumberOfVoxels = 2**31 - 1
+  @staticmethod
+  def GetOperations():
+    return list(IslandsEffect._operationsConverter.keys())
+
+  @staticmethod
+  def GetName():
+    return "SegmentEditor.Islands"
+  @staticmethod
+  def GetParameters():
+    return [
+      ('Operation', StringComboBoxParameter(IslandsEffect.GetOperations())),
+      ('Minimum Size', IntegerParameter(value=1000, minimum=1, maximum=IslandsEffect.MaximumNumberOfVoxels, singleStep=1, suffix=' voxels'))
+    ]
+
+  def __init__(self):
+    SegmentEditorBase.__init__(self)
+    self._effect = self._segmentEditorWidget.effectByName(self.EffectName)
+    self.SetOperation(self.DefaultOperation)
+
+  def SetOperation(self, operation):
+    self._effect.setParameter("Operation", self._operationsConverter[operation])
+
+  def SetMinimumSize(self, voxels):
+    self._effect.setParameter("MinimumSize", voxels)
+
+###############################################################################
 
 # for thresholding we are going to go take a volume as an input
 @slicerPipeline
