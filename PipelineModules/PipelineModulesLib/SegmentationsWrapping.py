@@ -1,7 +1,7 @@
 import vtk
 import slicer
 from PipelineCreator import slicerPipeline
-from .PipelineParameters import FloatParameter
+from .PipelineParameters import FloatParameterWithSlider
 
 @slicerPipeline
 class ConvertModelToSegmentation(object):
@@ -11,12 +11,12 @@ class ConvertModelToSegmentation(object):
     @staticmethod
     def GetParameters():
       return [
-        ('Volume Spacing X', FloatParameter(value=0.2, minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
-        ('Volume Spacing Y', FloatParameter(value=0.2, minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
-        ('Volume Spacing Z', FloatParameter(value=0.2, minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
-        ('Volume Margin X', FloatParameter(value=10.0, minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
-        ('Volume Margin Y', FloatParameter(value=10.0, minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
-        ('Volume Margin Z', FloatParameter(value=10.0, minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
+        ('Volume Spacing X', FloatParameterWithSlider(value=0.2, minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
+        ('Volume Spacing Y', FloatParameterWithSlider(value=0.2, minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
+        ('Volume Spacing Z', FloatParameterWithSlider(value=0.2, minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
+        ('Volume Margin X', FloatParameterWithSlider(value=10.0, minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
+        ('Volume Margin Y', FloatParameterWithSlider(value=10.0, minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
+        ('Volume Margin Z', FloatParameterWithSlider(value=10.0, minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
       ]
     @staticmethod
     def GetInputType():

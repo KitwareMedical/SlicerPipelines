@@ -2,6 +2,47 @@ import qt
 import ctk
 
 class IntegerParameter(object):
+  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None, suffix=None):
+    self._spinbox = qt.QSpinBox()
+    if singleStep is not None:
+      self._spinbox.setSingleStep(singleStep)
+    if minimum is not None:
+      self._spinbox.setMinimum(minimum)
+    if maximum is not None:
+      self._spinbox.setMaximum(maximum)
+    if value is not None:
+      self._spinbox.value = value
+    if suffix is not None:
+      self._spinbox.suffix = suffix
+
+  def GetUI(self):
+    return self._spinbox
+
+  def GetValue(self):
+    return self._spinbox.value
+
+class FloatParameter(object):
+  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None, decimals=2, suffix=None):
+    self._spinbox = qt.QDoubleSpinBox()
+    self._spinbox.setDecimals(decimals)
+    if singleStep is not None:
+      self._spinbox.setSingleStep(singleStep)
+    if minimum is not None:
+      self._spinbox.setMinimum(minimum)
+    if maximum is not None:
+      self._spinbox.setMaximum(maximum)
+    if value is not None:
+      self._spinbox.value = value
+    if suffix is not None:
+      self._spinbox.suffix = suffix
+
+  def GetUI(self):
+    return self._spinbox
+
+  def GetValue(self):
+    return self._spinbox.value
+
+class IntegerParameterWithSlider(object):
   """
   Creates a parameter for getting integer values conforming to the
   PipelineCreator's needs that has a UI of both a slider and a spinbox
@@ -44,7 +85,7 @@ class IntegerParameter(object):
   def GetValue(self):
     return self._spinbox.value
 
-class FloatParameter(object):
+class FloatParameterWithSlider(object):
   """
   Creates a parameter for getting float values conforming to the
   PipelineCreator's needs that has a UI of both a slider and a spinbox

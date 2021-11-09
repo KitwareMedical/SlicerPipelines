@@ -1,6 +1,6 @@
 import slicer
 from PipelineCreator import slicerPipeline
-from .PipelineParameters import StringComboBoxParameter, FloatParameter, FloatRangeParameter
+from .PipelineParameters import IntegerParameter, StringComboBoxParameter, FloatParameterWithSlider, FloatRangeParameter
 import SegmentEditorEffects
 
 ###############################################################################
@@ -65,7 +65,7 @@ class SmoothingEffect(SegmentEditorBase):
   def GetParameters():
     return [
       ('Smoothing Method', StringComboBoxParameter(SmoothingEffect.GetSmoothingMethods())),
-      ('Kernel Size', FloatParameter(value=SmoothingEffect.DefaultKernelSize, minimum=0.1, maximum=100.0, singleStep=0.01, decimals=1, suffix='mm')),
+      ('Kernel Size', FloatParameterWithSlider(value=SmoothingEffect.DefaultKernelSize, minimum=0.1, maximum=100.0, singleStep=0.01, decimals=1, suffix='mm')),
     ]
 
   def __init__(self):
@@ -97,7 +97,7 @@ class MarginEffect(SegmentEditorBase):
   def GetParameters():
     return [
       ('Operation', StringComboBoxParameter(MarginEffect.GetOperations())),
-      ('Margin Size', FloatParameter(value=MarginEffect.DefaultMarginSize, minimum=0.01, maximum=100.0, singleStep=0.01, decimals=2, suffix='mm')),
+      ('Margin Size', FloatParameterWithSlider(value=MarginEffect.DefaultMarginSize, minimum=0.01, maximum=100.0, singleStep=0.01, decimals=2, suffix='mm')),
     ]
 
   def __init__(self):
@@ -139,7 +139,7 @@ class HollowEffect(SegmentEditorBase):
   def GetParameters():
     return [
       ('Shell Option', StringComboBoxParameter(HollowEffect.GetShellOptions())),
-      ('Thickness', FloatParameter(value=HollowEffect.DefaultShellThickness, minimum=0.01, maximum=100.0, singleStep=0.01, decimals=2, suffix='mm')),
+      ('Thickness', FloatParameterWithSlider(value=HollowEffect.DefaultShellThickness, minimum=0.01, maximum=100.0, singleStep=0.01, decimals=2, suffix='mm')),
     ]
 
   def __init__(self):

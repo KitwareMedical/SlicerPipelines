@@ -4,7 +4,7 @@ import textwrap
 
 import slicer # Note: this import may show up as unused in linting, but it is needed for the exec calls to work
 import vtk # Note: this import may show up as unused in linting, but it is needed for the exec calls to work
-from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameter, IntegerParameter
+from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameterWithSlider, IntegerParameterWithSlider
 
 def _fixUpParameterName(parameterName):
   newName = parameterName.replace(" ", "")
@@ -13,7 +13,7 @@ def _fixUpParameterName(parameterName):
   return newName
 
 def _doubleParamUI(param):
-  return FloatParameter(
+  return FloatParameterWithSlider(
     value=param.get('value', None),
     minimum=param.get('minimum', None),
     maximum=param.get('maximum', None),
@@ -21,7 +21,7 @@ def _doubleParamUI(param):
     decimals=param.get('decimals', None))
 
 def _integerParamUI(param):
-  return IntegerParameter(
+  return IntegerParameterWithSlider(
     value=param.get('value', None),
     minimum=param.get('minimum', None),
     maximum=param.get('maximum', None),

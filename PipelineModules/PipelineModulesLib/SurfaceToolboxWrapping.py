@@ -1,6 +1,6 @@
 import slicer
 from PipelineCreator import slicerPipeline
-from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameter, IntegerParameter
+from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameterWithSlider, IntegerParameterWithSlider
 from SurfaceToolbox import SurfaceToolboxLogic
 
 ###############################################################################
@@ -58,7 +58,7 @@ class Decimation(SurfaceToolboxBase):
   @staticmethod
   def GetParameters():
     return [
-      ('Reduction', FloatParameter(value=0.8, minimum=0.0, maximum=1.0, singleStep=0.01)),
+      ('Reduction', FloatParameterWithSlider(value=0.8, minimum=0.0, maximum=1.0, singleStep=0.01)),
       ('Boundary Deletion', BooleanParameter(True)),
     ]
 
@@ -88,9 +88,9 @@ class ScaleMesh(SurfaceToolboxBase):
   @staticmethod
   def GetParameters():
     return [
-      ('ScaleX', FloatParameter(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
-      ('ScaleY', FloatParameter(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
-      ('ScaleZ', FloatParameter(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
+      ('ScaleX', FloatParameterWithSlider(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
+      ('ScaleY', FloatParameterWithSlider(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
+      ('ScaleZ', FloatParameterWithSlider(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
     ]
 
   def SetScaleX(self, scale):
@@ -121,8 +121,8 @@ class Smoothing(SurfaceToolboxBase):
   def GetParameters():
     return [
       ('Method', StringComboBoxParameter(['Laplace', 'Taubin'])),
-      ('Iterations', IntegerParameter(value=100, minimum=0, maximum=500, singleStep=1)),
-      ('Relaxation', FloatParameter(value=0.5, minimum=0.0, maximum=1.0, singleStep=0.1)),
+      ('Iterations', IntegerParameterWithSlider(value=100, minimum=0, maximum=500, singleStep=1)),
+      ('Relaxation', FloatParameterWithSlider(value=0.5, minimum=0.0, maximum=1.0, singleStep=0.1)),
       ('Boundary Smoothing', BooleanParameter(True)),
     ]
 
