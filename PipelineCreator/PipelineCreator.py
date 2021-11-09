@@ -682,19 +682,20 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     ]
 
     join = os.path.join
-    pipelineTemplateModulePath = self.resourcePath('PipelineTemplateModule').rstrip('/')
-    for dirpath, dirs, files in os.walk(pipelineTemplateModulePath):
+    normpath = os.path.normpath
+    relpath = os.path.relpath
+    pipelineTemplateModulePath = normpath(self.resourcePath('PipelineTemplateModule'))
+    for rootdir, dirs, files in os.walk(pipelineTemplateModulePath):
       # Create any directories
       for directory in dirs:
-        relativeDirectory = join(dirpath[len(pipelineTemplateModulePath):], directory).strip('/')
+        relativeDirectory = normpath(relpath(join(rootdir, directory), pipelineTemplateModulePath))
         outdir = join(outputDirectory, relativeDirectory)
         os.mkdir(outdir)
 
       # Copy all files
       for file in files:
-        fullFilePath = join(dirpath, file)
-        relativeFilePath = fullFilePath[len(pipelineTemplateModulePath):].strip('/')
-        relativeFilePath = relativeFilePath.replace('XXX', replacements['MODULE_NAME'])
+        fullFilePath = join(rootdir, file)
+        relativeFilePath = normpath(relpath(fullFilePath, pipelineTemplateModulePath)).replace('XXX', replacements['MODULE_NAME'])
         if not file.endswith('.template'):
           # If the filename doesn't end in .template, just copy as is
           outputFilePath = join(outputDirectory, relativeFilePath)
@@ -724,8 +725,9 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     Gets the indentation of the first line in content that has lineContent
     """
     for line in content.splitlines():
-      if lineContent in line:
-        return line.replace(lineContent, "")
+      loc = line.find(lineContent)
+      if loc != -1:
+        return line[:loc]
     return ""
 
 #
