@@ -1,4 +1,5 @@
 import qt
+import ctk
 
 class IntegerParameter(object):
   """
@@ -116,3 +117,28 @@ class StringComboBoxParameter(object):
 
   def GetValue(self):
     return self._comboBox.currentText
+
+class FloatRangeParameter(object):
+  def __init__(self, minimumValue=None, maximumValue=None, minimum=None, maximum=None,
+               singleStep=None, decimals=None, suffix=None):
+    self._rangeWidget = ctk.ctkRangeWidget()
+    #important to set minimum/maximum before minimumValue/maximumValue
+    if minimum:
+      self._rangeWidget.minimum = minimum
+    if maximum:
+      self._rangeWidget.maximum = maximum
+    if minimumValue:
+      self._rangeWidget.minimumValue = minimumValue
+    if maximumValue:
+      self._rangeWidget.maximumValue = maximumValue
+    if singleStep:
+      self._rangeWidget.singleStep = singleStep
+    if decimals:
+      self._rangeWidget.decimals = decimals
+    if suffix:
+      self._rangeWidget.suffix = suffix
+
+  def GetUI(self):
+    return self._rangeWidget
+  def GetValue(self):
+    return (self._rangeWidget.minimumValue, self._rangeWidget.maximumValue)
