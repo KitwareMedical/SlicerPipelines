@@ -79,6 +79,10 @@ def _makeFilterClass(item):
         return '{name}'
 
       @staticmethod
+      def GetDependencies():
+        return []
+
+      @staticmethod
       def GetInputType():
         return '{inputType}'
 
