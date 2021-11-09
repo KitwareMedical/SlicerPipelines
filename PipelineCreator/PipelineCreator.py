@@ -715,12 +715,13 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
             )
       methodText += "  nodes.append(nextPipelinePiece.Run(nodes[-1]))\n\n"
     methodText += "  if self.deleteIntermediates:\n" + \
+                  "    shNode = slicer.mrmlScene.GetSubjectHierarchyNode()\n" + \
                   "    for node in nodes[1:-1]:\n" + \
                   "      # Only remove if it is not the actual input or output.\n" + \
                   "      # This is possible if the first or last pipeline module did\n" + \
                   "      # shallow copy\n" + \
                   "      if node is not nodes[0] and node is not nodes[-1]:\n" + \
-                  "        slicer.mrmlScene.RemoveNode(node)\n\n" + \
+                  "        shNode.RemoveItem(shNode.GetItemByDataNode(node))\n" + \
                   "  return nodes[-1]\n"
     return methodText
 
