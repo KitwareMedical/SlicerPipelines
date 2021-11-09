@@ -1,0 +1,198 @@
+import slicer
+from PipelineCreator import slicerPipeline
+from .PipelineParameters import StringComboBoxParameter, FloatParameter, FloatRangeParameter
+import SegmentEditorEffects
+
+###############################################################################
+class SegmentEditorBase(object):
+  def __init__(self):
+    self._segmentEditorWidget = slicer.qMRMLSegmentEditorWidget()
+    self._segmentEditorNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentEditorNode')
+    self._segmentEditorWidget.setMRMLSegmentEditorNode(self._segmentEditorNode)
+    self._segmentEditorWidget.setMRMLScene(slicer.mrmlScene)
+
+  @staticmethod
+  def GetInputType():
+    return "vtkMRMLSegmentationNode"
+
+  @staticmethod
+  def GetOutputType():
+    return "vtkMRMLSegmentationNode"
+
+  @staticmethod
+  def GetDependencies():
+    return ['SegmentEditor', 'Segmentations']
+
+  def setMRMLScene(self, scene):
+    self._segmentEditorWidget.setMRMLScene(scene)
+
+  def Run(self, input):
+    shNode = slicer.mrmlScene.GetSubjectHierarchyNode()
+    itemID = shNode.GetItemByDataNode(input)
+    newItemID = slicer.modules.subjecthierarchy.logic().CloneSubjectHierarchyItem(shNode, itemID)
+    return self._RunNoCopy(shNode.GetItemDataNode(newItemID))
+
+  def _RunNoCopy(self, input):
+    self._segmentEditorWidget.setSegmentationNode(input)
+    #important we set the segmentation node before the active effect name
+    self._segmentEditorWidget.setActiveEffectByName(self.EffectName)
+    self._segmentEditorWidget.activeEffect().self().onApply()
+    return input
+
+
+###############################################################################
+@slicerPipeline
+class SmoothingEffect(SegmentEditorBase):
+  EffectName = 'Smoothing'
+  DefaultKernelSize = 3.0
+  DefaultMethod = 'Median'
+  _methodConverter = {
+     'Median': 'MEDIAN',
+     'Gaussian': 'GAUSSIAN',
+     'Opening': 'MORPHOLOGICAL_OPENING',
+     'Closing': 'MORPHOLOGICAL_CLOSING',
+     'Joint Smoothing': 'JOINT_TAUBIN',
+  }
+  @staticmethod
+  def GetSmoothingMethods():
+    return list(SmoothingEffect._methodConverter.keys())
+
+  @staticmethod
+  def GetName():
+    return "SegmentEditor.Smoothing"
+
+  @staticmethod
+  def GetParameters():
+    return [
+      ('Smoothing Method', StringComboBoxParameter(SmoothingEffect.GetSmoothingMethods())),
+      ('Kernel Size', FloatParameter(value=SmoothingEffect.DefaultKernelSize, minimum=0.1, maximum=100.0, singleStep=0.01, decimals=1, suffix='mm')),
+    ]
+
+  def __init__(self):
+    SegmentEditorBase.__init__(self)
+    self._effect = self._segmentEditorWidget.effectByName(self.EffectName)
+    self.SetKernelSize(self.DefaultKernelSize)
+    self.SetSmoothingMethod(self.DefaultMethod)
+
+  def SetSmoothingMethod(self, method):
+    self._effect.setParameter("SmoothingMethod", self._methodConverter[method])
+
+  def SetKernelSize(self, kernelSize):
+    self._effect.setParameter("KernelSizeMm", kernelSize)
+
+###############################################################################
+@slicerPipeline
+class MarginEffect(SegmentEditorBase):
+  EffectName = 'Margin'
+  DefaultMarginSize = 2.00
+  DefaultOperation = 'Grow'
+  @staticmethod
+  def GetOperations():
+    return ['Grow', 'Shrink']
+
+  @staticmethod
+  def GetName():
+    return "SegmentEditor.Margin"
+  @staticmethod
+  def GetParameters():
+    return [
+      ('Operation', StringComboBoxParameter(MarginEffect.GetOperations())),
+      ('Margin Size', FloatParameter(value=MarginEffect.DefaultMarginSize, minimum=0.01, maximum=100.0, singleStep=0.01, decimals=2, suffix='mm')),
+    ]
+
+  def __init__(self):
+    SegmentEditorBase.__init__(self)
+    self._effect = self._segmentEditorWidget.effectByName(self.EffectName)
+    #note: because the DefaultMarginSize is positive, we default to 'Grow'
+    self._effect.setParameter("MarginSizeMm", self.DefaultMarginSize)
+
+  def SetMarginSize(self, marginSize):
+    """
+    Sets the margin size, a positive, floating point value.
+    """
+    currentSize = self._effect.doubleParameter("MarginSizeMm")
+    self._effect.setParameter("MarginSizeMm", marginSize if currentSize >= 0.0 else -marginSize)
+
+  def SetOperation(self, operation):
+    absCurrentSize = abs(self._effect.doubleParameter("MarginSizeMm"))
+    self._effect.setParameter("MarginSizeMm", absCurrentSize if operation == "Grow" else -absCurrentSize)
+
+###############################################################################
+@slicerPipeline
+class HollowEffect(SegmentEditorBase):
+  EffectName = 'Hollow'
+  DefaultShellThickness = 3.00
+  _optionsConverter = {
+    'Segment is Inside Surface': SegmentEditorEffects.INSIDE_SURFACE,
+    'Segment is Medial Surface': SegmentEditorEffects.MEDIAL_SURFACE,
+    'Segment is Outside Surface': SegmentEditorEffects.OUTSIDE_SURFACE,
+  }
+  DefaultShellOption = list(_optionsConverter.keys())[0]
+  @staticmethod
+  def GetShellOptions():
+    return list(HollowEffect._optionsConverter.keys())
+
+  @staticmethod
+  def GetName():
+    return "SegmentEditor.Hollow"
+  @staticmethod
+  def GetParameters():
+    return [
+      ('Shell Option', StringComboBoxParameter(HollowEffect.GetShellOptions())),
+      ('Thickness', FloatParameter(value=HollowEffect.DefaultShellThickness, minimum=0.01, maximum=100.0, singleStep=0.01, decimals=2, suffix='mm')),
+    ]
+
+  def __init__(self):
+    SegmentEditorBase.__init__(self)
+    self._effect = self._segmentEditorWidget.effectByName(self.EffectName)
+    self.SetThickness(self.DefaultShellThickness)
+    self.SetShellOption(self.DefaultShellOption)
+
+  def SetThickness(self, thickness):
+    self._effect.setParameter("ShellThicknessMm", thickness)
+
+  def SetShellOption(self, option):
+    self._effect.setParameter("ShellMode", HollowEffect._optionsConverter[option])
+
+###############################################################################
+
+# for thresholding we are going to go take a volume as an input
+@slicerPipeline
+class ThresholdingEffect(SegmentEditorBase):
+  EffectName = 'Threshold'
+  DefaultThresholdRange = (-100., 100.)
+
+  @staticmethod
+  def GetInputType():
+    return 'vtkMRMLScalarVolumeNode'
+  @staticmethod
+  def GetName():
+    return 'SegmentEditor.Thresholding'
+  @staticmethod
+  def GetParameters():
+    return [
+      ('Threshold Range', FloatRangeParameter(
+        minimumValue=ThresholdingEffect.DefaultThresholdRange[0],
+        maximumValue=ThresholdingEffect.DefaultThresholdRange[1],
+        minimum=-1000.,
+        maximum=1000.,
+        singleStep=1.85,
+        decimals=2)),
+    ]
+  def __init__(self):
+    SegmentEditorBase.__init__(self)
+    self._effect = self._segmentEditorWidget.effectByName(self.EffectName)
+    self.SetThresholdRange(self.DefaultThresholdRange)
+
+  def SetThresholdRange(self, range):
+    self._effect.setParameter("MinimumThreshold", range[0])
+    self._effect.setParameter("MaximumThreshold", range[1])
+
+  def Run(self, input):
+    segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode')
+    segmentationNode.CreateBinaryLabelmapRepresentation()
+    segmentationNode.CreateDefaultDisplayNodes()
+    segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(input)
+    segmentationNode.GetSegmentation().AddEmptySegment()
+    self._segmentEditorWidget.setMasterVolumeNode(input)
+    return SegmentEditorBase._RunNoCopy(self, segmentationNode)

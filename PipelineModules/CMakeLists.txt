@@ -5,6 +5,8 @@ set(MODULE_NAME PipelineModules)
 set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
   PipelineModulesLib/PipelineParameters.py
+  PipelineModulesLib/SegmentationsWrapping.py
+  PipelineModulesLib/SegmentEditorWrapping.py
   PipelineModulesLib/SurfaceToolboxWrapping.py
   PipelineModulesLib/vtkFilterJSONReader.py
   )
