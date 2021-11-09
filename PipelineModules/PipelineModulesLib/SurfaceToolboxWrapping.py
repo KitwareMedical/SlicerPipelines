@@ -6,8 +6,7 @@ from SurfaceToolbox import SurfaceToolboxLogic
 ###############################################################################
 class SurfaceToolboxBase(object):
   def __init__(self):
-    self._parameterNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScriptedModuleNode")
-    slicer.mrmlScene.AddNode(self._parameterNode)
+    self._parameterNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScriptedModuleNode")
     self._surfaceToolboxLogic = SurfaceToolboxLogic()
     self._surfaceToolboxLogic.setDefaultParameters(self._parameterNode)
 
@@ -52,7 +51,8 @@ class Decimation(SurfaceToolboxBase):
     SurfaceToolboxBase.__init__(self)
     self.parameterNode.SetParameter("decimation", "true")
 
-  def GetName(self):
+  @staticmethod
+  def GetName():
     return "SurfaceToolbox.Decimation"
 
   @staticmethod
