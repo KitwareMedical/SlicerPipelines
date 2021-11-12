@@ -148,22 +148,3 @@ class Smoothing(SurfaceToolboxBase):
     self.parameterNode.SetParameter("smoothingBoundarySmoothing", "true" if boundarySmoothing else "false")
   def GetBoundarySmoothing(self):
     return self.parameterNode.GetParameter("smoothingBoundarySmoothing") == "true"
-
-###############################################################################
-@slicerPipeline
-class Cleaner(SurfaceToolboxBase):
-  def __init__(self):
-    SurfaceToolboxBase.__init__(self)
-    self.parameterNode.SetParameter("clean", "true")
-
-  @staticmethod
-  def GetName():
-    return "SurfaceToolbox.Cleaner"
-
-  @staticmethod
-  def GetParameters():
-    return []
-
-  def Run(self, input):
-    print("Running "+ self.GetName())
-    return input
