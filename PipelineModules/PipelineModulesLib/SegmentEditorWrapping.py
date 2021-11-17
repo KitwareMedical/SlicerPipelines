@@ -11,6 +11,10 @@ class SegmentEditorBase(object):
     self._segmentEditorWidget.setMRMLSegmentEditorNode(self._segmentEditorNode)
     self._segmentEditorWidget.setMRMLScene(slicer.mrmlScene)
 
+  def __del__(self):
+    self._segmentEditorWidget.setMRMLScene(None)
+    slicer.mrmlScene.RemoveNode(self._segmentEditorNode)
+
   @staticmethod
   def GetInputType():
     return "vtkMRMLSegmentationNode"
