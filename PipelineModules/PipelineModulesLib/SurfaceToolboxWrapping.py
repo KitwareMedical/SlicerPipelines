@@ -12,6 +12,9 @@ class SurfaceToolboxBase(object):
 
     self.verboseRun = False
 
+  def __del__(self):
+    slicer.mrmlScene.RemoveNode(self._parameterNode)
+
   @staticmethod
   def GetDependencies():
     return ['SurfaceToolbox']
@@ -24,10 +27,12 @@ class SurfaceToolboxBase(object):
   def surfaceToolboxLogic(self):
     return self._surfaceToolboxLogic
 
-  def GetInputType(self):
+  @staticmethod
+  def GetInputType():
     return "vtkMRMLModelNode"
 
-  def GetOutputType(self):
+  @staticmethod
+  def GetOutputType():
     return "vtkMRMLModelNode"
 
   def Run(self, input):
