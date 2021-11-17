@@ -172,7 +172,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
   def _convertModuleButtonsToLogicInput(self):
     return [
         (b.module.name, {
-          paramName: param.GetValue() for paramName, param in b.parameters #TODO if param is fixed
+          paramTup[0]: paramTup[-1].GetValue() for paramTup in b.parameters #TODO if param is fixed
         }) for b in self._moduleButtons
       ]
 
@@ -196,27 +196,33 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
   def _onRun(self):
     modules = self._convertModuleButtonsToLogicInput()
     inputNode = self.ui.cboxTestInput.currentNode()
-    actualOutputNode = self.logic.runPipeline(modules, inputNode)
+    try:
+      actualOutputNode = self.logic.runPipeline(modules, inputNode)
 
-    desiredOutputNode = self.ui.cboxTestOutput.currentNode()
-    if desiredOutputNode is not None:
-      #doing vtkMRMLNode::Copy breaks the references to the display and storage nodes. Grab them now so we can delete them.
-      displayNodes = [desiredOutputNode.GetNthDisplayNode(n) for n in range(desiredOutputNode.GetNumberOfDisplayNodes())]
-      storageNodes = [desiredOutputNode.GetNthStorageNode(n) for n in range(desiredOutputNode.GetNumberOfStorageNodes())]
+      desiredOutputNode = self.ui.cboxTestOutput.currentNode()
+      if desiredOutputNode is not None:
+        #doing vtkMRMLNode::Copy breaks the references to the display and storage nodes. Grab them now so we can delete them.
+          displayNodes = [desiredOutputNode.GetNthDisplayNode(n) for n in range(desiredOutputNode.GetNumberOfDisplayNodes())]
+          storageNodes = [desiredOutputNode.GetNthStorageNode(n) for n in range(desiredOutputNode.GetNumberOfStorageNodes())]
 
-      # copy into node, but keep name
-      name = desiredOutputNode.GetName()
-      desiredOutputNode.Copy(actualOutputNode)
-      desiredOutputNode.SetName(name)
+        # copy into node, but keep name
+        name = desiredOutputNode.GetName()
+        desiredOutputNode.Copy(actualOutputNode)
+        desiredOutputNode.SetName(name)
 
-      for n in itertools.chain(displayNodes, storageNodes):
-        slicer.mrmlScene.RemoveNode(n)
-    slicer.mrmlScene.RemoveNode(actualOutputNode)
-    if not desiredOutputNode.GetDisplayNode():
-      desiredOutputNode.CreateDefaultDisplayNodes()
+        for n in itertools.chain(displayNodes, storageNodes):
+          slicer.mrmlScene.RemoveNode(n)
+      slicer.mrmlScene.RemoveNode(actualOutputNode)
+      if not desiredOutputNode.GetDisplayNode():
+        desiredOutputNode.CreateDefaultDisplayNodes()
 
-    inputNode.GetDisplayNode().SetVisibility(False)
-    desiredOutputNode.GetDisplayNode().SetVisibility(True)
+      inputNode.GetDisplayNode().SetVisibility(False)
+      desiredOutputNode.GetDisplayNode().SetVisibility(True)
+    except Exception as e:
+      msgbox = qt.QMessageBox()
+      msgbox.setWindowTitle("Error running pipeline")
+      msgbox.setText(str(e))
+      msgbox.exec()
 
   def _modulesChanged(self):
     testable = self._verifyInputOutputFlow() and self._moduleButtons
@@ -327,22 +333,27 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       #input type
       moduleFormLayout = qt.QFormLayout()
       hlayout.addLayout(moduleFormLayout)
-      inputTypeLabel = qt.QLabel("Input Type:")
+      inputTypeLabel = qt.QLabel("Input Type")
       inputTypeLineEdit = qt.QLineEdit(module.inputType)
       inputTypeLineEdit.setReadOnly(True)
       moduleFormLayout.addRow(inputTypeLabel, inputTypeLineEdit)
 
       #parameters
       buttonHolder.parameters = module.MakeParameters()
-      for name, param in buttonHolder.parameters:
+      for tup in buttonHolder.parameters:
         try:
-          moduleFormLayout.addRow(name + ":", param.GetUI())
+          if len(tup) == 2: #name, ui
+            name, param = tup
+            moduleFormLayout.addRow(name, param.GetUI())
+          elif len(tup) == 3: #name, label, ui
+            _, label, param = tup
+            moduleFormLayout.addRow(label, param.GetUI())
         except Exception as e:
           raise Exception ("Exception trying to create parameter: '%s' for module '%s'\n    %s"
-            % (name, module.name, str(e)))
+            % (tup[0], module.name, str(e)))
 
       #output type
-      outputTypeLabel = qt.QLabel("Output Type:")
+      outputTypeLabel = qt.QLabel("Output Type")
       outputTypeLineEdit = qt.QLineEdit(module.outputType)
       outputTypeLineEdit.setReadOnly(True)
       moduleFormLayout.addRow(outputTypeLabel, outputTypeLineEdit)
@@ -686,18 +697,44 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       raise Exception("Invalid name: '%s'" % newName)
     return newName
 
+  _beginningOfRunMethod='''
+def Run(self, inputNode):
+  nodes = [inputNode]
+  def deleteIntermediates():
+    if self.deleteIntermediates:
+      shNode = slicer.mrmlScene.GetSubjectHierarchyNode()
+      for node in nodes[1:-1]:
+        # Only remove if it is not the actual input or output.
+        # This is possible if the first or last pipeline module did
+        # shallow copy
+        if node is not nodes[0] and node is not nodes[-1]:
+          shNode.RemoveItem(shNode.GetItemByDataNode(node))
+  try:
+'''.lstrip('\n')
+
+  _endOfRunMethod ='''
+    deleteIntermediates()
+    return nodes[-1]
+  except:
+    deleteIntermediates()
+    raise
+'''.lstrip('\n')
+
   def _createRunMethod(self, modules):
-    methodText = "def Run(self, inputNode):\n" + \
-                 "  nodes = [inputNode]\n"
+    methodText = self._beginningOfRunMethod
     for moduleName, parameters in modules:
       moduleHolder = self.moduleFromName(moduleName)
       #the register doesn't really care if it gets a class or an instance, so handle both cases
-      methodText += "  # {stringClass}\n".format(stringClass=str(moduleHolder.moduleClass))
-      methodText += "  nextPipelinePiece = pickle.loads({pickledClass})()\n".format(
+      methodText += "    # {stringClass}\n".format(stringClass=str(moduleHolder.moduleClass))
+      methodText += "    nextPipelinePiece = pickle.loads({pickledClass})()\n".format(
           pickledClass=pickle.dumps(moduleHolder.moduleClass),
         )
 
-      for parameterName, parameterValue in parameters.items():
+      for parameterTup in parameters.items():
+        if len(parameterTup) == 2:
+          parameterName, parameterValue = parameterTup
+        elif len(parameterTup) == 3:
+          parameterName, _, parameterValue = parameterTup
         # we require parameter values to be pickleable, not stringable, but the strings
         # are nice when possible
         try:
@@ -710,27 +747,19 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
           if isinstance(parameterValue, str):
             #if string add quotes
             strValue = '"%s"' % strValue
-          methodText += "  nextPipelinePiece.Set{parameterName}({strValue})\n".format(
+          methodText += "    nextPipelinePiece.Set{parameterName}({strValue})\n".format(
             parameterName=self.fixUpParameterName(parameterName),
             strValue=strValue,
           )
         else:
           #fallback to pickle method
-          methodText += "  nextPipelinePiece.Set{parameterName}(pickle.loads({pickledValue})) # {strValue}\n".format(
+          methodText += "    nextPipelinePiece.Set{parameterName}(pickle.loads({pickledValue})) # {strValue}\n".format(
               parameterName=self.fixUpParameterName(parameterName),
               pickledValue=pickle.dumps(parameterValue),
               strValue=strValue,
             )
-      methodText += "  nodes.append(nextPipelinePiece.Run(nodes[-1]))\n\n"
-    methodText += "  if self.deleteIntermediates:\n" + \
-                  "    shNode = slicer.mrmlScene.GetSubjectHierarchyNode()\n" + \
-                  "    for node in nodes[1:-1]:\n" + \
-                  "      # Only remove if it is not the actual input or output.\n" + \
-                  "      # This is possible if the first or last pipeline module did\n" + \
-                  "      # shallow copy\n" + \
-                  "      if node is not nodes[0] and node is not nodes[-1]:\n" + \
-                  "        shNode.RemoveItem(shNode.GetItemByDataNode(node))\n" + \
-                  "  return nodes[-1]\n"
+      methodText += "    nodes.append(nextPipelinePiece.Run(nodes[-1]))\n\n"
+    methodText += self._endOfRunMethod
     return methodText
 
   def moduleFromName(self, moduleName):

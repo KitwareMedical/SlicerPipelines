@@ -163,23 +163,30 @@ class {{MODULE_NAME}}Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
   def onRun(self):
     inputNode = self.ui.InputNodeComboBox.currentNode()
     if inputNode is not None:
-      actualOutputNode = self.logic.Run(inputNode)
-      desiredOutputNode = self.ui.OutputNodeComboBox.currentNode()
-      if desiredOutputNode is not None:
-        #doing vtkMRMLNode::Copy breaks the references to the display and storage nodes. Grab them now so we can delete them.
-        displayNodes = [desiredOutputNode.GetNthDisplayNode(n) for n in range(desiredOutputNode.GetNumberOfDisplayNodes())]
-        storageNodes = [desiredOutputNode.GetNthStorageNode(n) for n in range(desiredOutputNode.GetNumberOfStorageNodes())]
+      try:
+        actualOutputNode = self.logic.Run(inputNode)
+        if actualOutputNode is not None:
+          desiredOutputNode = self.ui.OutputNodeComboBox.currentNode()
+          if desiredOutputNode is not None:
+            #doing vtkMRMLNode::Copy breaks the references to the display and storage nodes. Grab them now so we can delete them.
+            displayNodes = [desiredOutputNode.GetNthDisplayNode(n) for n in range(desiredOutputNode.GetNumberOfDisplayNodes())]
+            storageNodes = [desiredOutputNode.GetNthStorageNode(n) for n in range(desiredOutputNode.GetNumberOfStorageNodes())]
 
-        # copy into node, but keep name
-        name = desiredOutputNode.GetName()
-        desiredOutputNode.Copy(actualOutputNode)
-        desiredOutputNode.SetName(name)
+            # copy into node, but keep name
+            name = desiredOutputNode.GetName()
+            desiredOutputNode.Copy(actualOutputNode)
+            desiredOutputNode.SetName(name)
 
-        for n in itertools.chain(displayNodes, storageNodes):
-          slicer.mrmlScene.RemoveNode(n)
-      slicer.mrmlScene.RemoveNode(actualOutputNode)
-      if not desiredOutputNode.GetDisplayNode():
-        desiredOutputNode.CreateDefaultDisplayNodes()
+            for n in itertools.chain(displayNodes, storageNodes):
+              slicer.mrmlScene.RemoveNode(n)
+          slicer.mrmlScene.RemoveNode(actualOutputNode)
+          if desiredOutputNode is not None and not desiredOutputNode.GetDisplayNode():
+            desiredOutputNode.CreateDefaultDisplayNodes()
+      except Exception as e:
+        msgbox = qt.QMessageBox()
+        msgbox.setWindowTitle("Error running pipeline")
+        msgbox.setText(str(e))
+        msgbox.exec()
 
 @slicerPipeline
 class {{MODULE_NAME}}Logic(ScriptedLoadableModuleLogic):
