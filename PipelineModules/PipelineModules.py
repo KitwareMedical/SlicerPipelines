@@ -6,6 +6,7 @@ from slicer.util import VTKObservationMixin
 
 #import all the default wrappings. doing the import will register them with the pipeline creator
 from PipelineModulesLib import (
+  CLIModuleWrapping,
   PipelineParameters,
   SegmentationsWrapping,
   SegmentEditorWrapping,
@@ -26,7 +27,11 @@ class PipelineModules(ScriptedLoadableModule):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "Pipeline Modules"
     self.parent.categories = ["Pipelines"]
-    self.parent.dependencies = ["PipelineCreator", "SegmentEditor"]  # TODO: add here list of module names that this module requires
+    self.parent.dependencies = [
+      "MeshToLabelMap",
+      "PipelineCreator",
+      "SegmentEditor",
+    ]
     self.parent.contributors = ["Connor Bowley (Kitware, Inc.)"]
     # TODO: update with short description of the module and a link to online module documentation
     self.parent.helpText = """
@@ -95,6 +100,10 @@ class PipelineModulesLogic(ScriptedLoadableModuleLogic):
   def loadVTKJSON(self, pipelineCreatorLogic):
     vtkFilterJSONReader.RegisterPipelineModules(pipelineCreatorLogic, self.resourcePath('PipelineVTKFilterJSON'))
 
+  def loadCLIModules(self, pipelineCreatorLogic):
+    #important that all modules in here show up as dependencies in PipelineModules class
+    CLIModuleWrapping.PipelineCLI(slicer.modules.meshtolabelmap, pipelineCreatorLogic, "mesh", excludeArgs=['reference'])
+
   def resourcePath(self, filename):
     scriptedModulesPath = os.path.dirname(slicer.util.modulePath(self.moduleName))
     return os.path.join(scriptedModulesPath, 'Resources', filename)
@@ -141,12 +150,19 @@ class PipelineModulesTest(ScriptedLoadableModuleTest):
     #TODO: tests for pipelines created by this module
     pass
 
+def _load():
+  pipelineCreator = PipelineCreatorLogic()
+  pipelineModules = PipelineModulesLogic()
+
+  pipelineModules.loadVTKJSON(pipelineCreator)
+  pipelineModules.loadCLIModules(pipelineCreator)
+
 #load the vtk json files when able
 try:
   slicer.modules.pipelinemodules
-  PipelineModulesLogic().loadVTKJSON(PipelineCreatorLogic()) #this will throw if pipelinecreator has not been loaded yet
+  _load()
 except AttributeError:
   def callback(moduleName):
     if "PipelineModules" == moduleName:
-      PipelineModulesLogic().loadVTKJSON(PipelineCreatorLogic())
+      _load()
   slicer.app.moduleManager().moduleLoaded.connect(callback)

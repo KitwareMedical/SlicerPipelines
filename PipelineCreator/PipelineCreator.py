@@ -281,6 +281,11 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       self.uiLayout.removeWidget(buttonHolder.cbutton)
       self._moduleButtons.remove(buttonHolder)
       self._modulesChanged()
+      # for some reason the buttonHolder is not getting deleted from memory
+      # delete the parameters as a temp solution for some clean up of memory
+      # In truth, the reason this is here is so the bridge parameters from the CLIModuleWrapping
+      # get properly deleted, but this class shouldn't really know about that
+      buttonHolder.parameters = None
 
   def _onModuleMoveUp(self, buttonHolder):
     self._onModuleMove(buttonHolder, -1)
