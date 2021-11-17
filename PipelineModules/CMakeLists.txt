@@ -1,9 +1,12 @@
 #-----------------------------------------------------------------------------
 set(MODULE_NAME PipelineModules)
 
+add_subdirectory(BridgeParameters)
+
 #-----------------------------------------------------------------------------
 set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
+  PipelineModulesLib/CLIModuleWrapping.py
   PipelineModulesLib/PipelineParameters.py
   PipelineModulesLib/SegmentationsWrapping.py
   PipelineModulesLib/SegmentEditorWrapping.py
