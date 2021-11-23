@@ -1,3 +1,4 @@
+import os
 import qt
 import ctk
 
@@ -183,3 +184,36 @@ class FloatRangeParameter(object):
     return self._rangeWidget
   def GetValue(self):
     return (self._rangeWidget.minimumValue, self._rangeWidget.maximumValue)
+
+class SaveFileParameter(object):
+  def __init__(self, filter=None, selectedFilter=None):
+    self._hlayout = qt.QHBoxLayout()
+    self._lineEdit = qt.QLineEdit()
+    self._browseButton = qt.QPushButton()
+    self._browseButton.setText("Browse")
+    self._browseButton.clicked.connect(self._onBrowse)
+
+    self._directory = os.path.expanduser("~")
+
+    if isinstance(filter, list) or isinstance(filter, tuple):
+      filter = ';;'.join(filter)
+
+    self._filter = filter or ''
+    self._selectedFilter = selectedFilter or ''
+
+    self._hlayout.addWidget(self._lineEdit)
+    self._hlayout.addWidget(self._browseButton)
+
+  def _onBrowse(self):
+    filename = qt.QFileDialog.getSaveFileName(self._lineEdit.parentWidget(),
+      "Save Model", os.path.join(self._directory, "model.vtk"),
+      self._filter, self._selectedFilter)
+    if filename:
+      self._lineEdit.text = filename
+      self._directory = os.path.dirname(filename)
+
+  def GetUI(self):
+    return self._hlayout
+
+  def GetValue(self):
+    return self._lineEdit.text

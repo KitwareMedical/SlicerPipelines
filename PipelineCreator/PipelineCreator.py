@@ -198,26 +198,26 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     inputNode = self.ui.cboxTestInput.currentNode()
     try:
       actualOutputNode = self.logic.runPipeline(modules, inputNode)
+      if actualOutputNode is not None:
+        desiredOutputNode = self.ui.cboxTestOutput.currentNode()
+        if desiredOutputNode is not None:
+          #doing vtkMRMLNode::Copy breaks the references to the display and storage nodes. Grab them now so we can delete them.
+          displayNodes = [desiredOutputNode.GetNthDisplayNode(n) for n in range(desiredOutputNode.GetNumberOfDisplayNodes())]
+          storageNodes = [desiredOutputNode.GetNthStorageNode(n) for n in range(desiredOutputNode.GetNumberOfStorageNodes())]
 
-      desiredOutputNode = self.ui.cboxTestOutput.currentNode()
-      if desiredOutputNode is not None:
-        #doing vtkMRMLNode::Copy breaks the references to the display and storage nodes. Grab them now so we can delete them.
-        displayNodes = [desiredOutputNode.GetNthDisplayNode(n) for n in range(desiredOutputNode.GetNumberOfDisplayNodes())]
-        storageNodes = [desiredOutputNode.GetNthStorageNode(n) for n in range(desiredOutputNode.GetNumberOfStorageNodes())]
+          # copy into node, but keep name
+          name = desiredOutputNode.GetName()
+          desiredOutputNode.Copy(actualOutputNode)
+          desiredOutputNode.SetName(name)
 
-        # copy into node, but keep name
-        name = desiredOutputNode.GetName()
-        desiredOutputNode.Copy(actualOutputNode)
-        desiredOutputNode.SetName(name)
+          for n in itertools.chain(displayNodes, storageNodes):
+            slicer.mrmlScene.RemoveNode(n)
+        slicer.mrmlScene.RemoveNode(actualOutputNode)
+        if not desiredOutputNode.GetDisplayNode():
+          desiredOutputNode.CreateDefaultDisplayNodes()
 
-        for n in itertools.chain(displayNodes, storageNodes):
-          slicer.mrmlScene.RemoveNode(n)
-      slicer.mrmlScene.RemoveNode(actualOutputNode)
-      if not desiredOutputNode.GetDisplayNode():
-        desiredOutputNode.CreateDefaultDisplayNodes()
-
-      inputNode.GetDisplayNode().SetVisibility(False)
-      desiredOutputNode.GetDisplayNode().SetVisibility(True)
+        inputNode.GetDisplayNode().SetVisibility(False)
+        desiredOutputNode.GetDisplayNode().SetVisibility(True)
     except Exception as e:
       msgbox = qt.QMessageBox()
       msgbox.setWindowTitle("Error running pipeline")
@@ -228,7 +228,13 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     testable = self._verifyInputOutputFlow() and self._moduleButtons
     if testable:
       self.ui.cboxTestInput.nodeTypes = (self._moduleButtons[0].module.inputType, )
-      self.ui.cboxTestOutput.nodeTypes = (self._moduleButtons[-1].module.outputType, )
+      if self._moduleButtons[-1].module.outputType is not None:
+        self.ui.lblTestOutput.show()
+        self.ui.cboxTestOutput.show()
+        self.ui.cboxTestOutput.nodeTypes = (self._moduleButtons[-1].module.outputType, )
+      else:
+        self.ui.lblTestOutput.hide()
+        self.ui.cboxTestOutput.hide()
     else:
       self.ui.cboxTestInput.nodeTypes = ()
       self.ui.cboxTestOutput.nodeTypes = ()
@@ -359,7 +365,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
       #output type
       outputTypeLabel = qt.QLabel("Output Type")
-      outputTypeLineEdit = qt.QLineEdit(module.outputType)
+      outputTypeLineEdit = qt.QLineEdit(str(module.outputType)) #str will make None -> 'None'
       outputTypeLineEdit.setReadOnly(True)
       moduleFormLayout.addRow(outputTypeLabel, outputTypeLineEdit)
 
@@ -666,6 +672,12 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       deps += module.dependencies
     deps = sorted(list(set(deps))) # Remove duplicates
 
+    firstModule = self.moduleFromName(modules[0][0])
+    lastModule = self.moduleFromName(modules[-1][0])
+
+    inputType = "'%s'" % firstModule.inputType if firstModule.inputType is not None else "None"
+    outputType = "'%s'" % lastModule.outputType if lastModule.outputType is not None else "None"
+
     replacements = {
       "MODULE_NAME": pipelineName,
       "MODULE_CATEGORIES": "['PipelineModules']", #TODO implement custom
@@ -676,19 +688,19 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       "MODULE_UPDATE_GUI_FROM_PARAMETER_NODE": "", #TODO implement as part of non-fixed parameters
       "MODULE_UPDATE_PARAMETER_NODE_FROM_GUI": "", #TODO implement as part of non-fixed parameters
       "MODULE_LOGIC_SET_METHODS": "", #TODO implement as part of non-fixed parameters
-      "MODULE_INPUT_TYPE": self.moduleFromName(modules[0][0]).inputType,
-      "MODULE_OUTPUT_TYPE": self.moduleFromName(modules[-1][0]).outputType,
+      "MODULE_INPUT_TYPE": inputType,
+      "MODULE_OUTPUT_TYPE": outputType,
     }
 
     self._makeModule(outputDirectory, replacements)
 
+  #this is anticipated to be needed for non-fixed parameters
   def _createSetupPipelineUIMethod(self, modules):
     inputType = self.moduleFromName(modules[0][0]).inputType
     outputType = self.moduleFromName(modules[-1][0]).outputType
     ret = """
     def setupPipelineUI(self):
-      self.ui.InputNodeComboBox.nodeTypes = ('{inputType}', ) # Need the comma so it doesn't split each character
-      self.ui.OutputNodeComboBox.nodeTypes = ('{outputType}', ) # Need the comma so it doesn't split each character
+      pass
     """.format(
       inputType=inputType,
       outputType=outputType,
@@ -703,7 +715,6 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     return newName
 
   _beginningOfRunMethod='''
-def Run(self, inputNode):
   nodes = [inputNode]
   def deleteIntermediates():
     if self.deleteIntermediates:
@@ -712,14 +723,16 @@ def Run(self, inputNode):
         # Only remove if it is not the actual input or output.
         # This is possible if the first or last pipeline module did
         # shallow copy
-        if node is not nodes[0] and node is not nodes[-1]:
-          shNode.RemoveItem(shNode.GetItemByDataNode(node))
+        if node is not None and node is not nodes[0] and node is not nodes[-1]:
+          itemId = shNode.GetItemByDataNode(node)
+          if itemId != 0:
+            shNode.RemoveItem(itemId)
   try:
 '''.lstrip('\n')
 
   _endOfRunMethod ='''
     deleteIntermediates()
-    return nodes[-1]
+    return nodes[-1] #Note: this may legitimately return None
   except:
     deleteIntermediates()
     raise
@@ -727,6 +740,12 @@ def Run(self, inputNode):
 
   def _createRunMethod(self, modules):
     methodText = self._beginningOfRunMethod
+
+    if self.moduleFromName(modules[0][0]).inputType is not None:
+      methodText = "def Run(self, inputNode):\n"
+    else:
+      methodText = "def Run(self):\n"
+    methodText += self._beginningOfRunMethod
     for moduleName, parameters in modules:
       moduleHolder = self.moduleFromName(moduleName)
       #the register doesn't really care if it gets a class or an instance, so handle both cases
@@ -763,7 +782,10 @@ def Run(self, inputNode):
               pickledValue=pickle.dumps(parameterValue),
               strValue=strValue,
             )
-      methodText += "    nodes.append(nextPipelinePiece.Run(nodes[-1]))\n\n"
+      if moduleHolder.inputType is not None:
+        methodText += "    nodes.append(nextPipelinePiece.Run(nodes[-1]))\n\n"
+      else:
+        methodText += "    nodes.append(nextPipelinePiece.Run()))\n\n"
     methodText += self._endOfRunMethod
     return methodText
 
