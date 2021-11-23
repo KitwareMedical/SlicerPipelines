@@ -1,6 +1,7 @@
 import collections
 import copy
 import inspect
+import itertools
 import keyword
 import os
 import pickle
@@ -199,10 +200,17 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
     desiredOutputNode = self.ui.cboxTestOutput.currentNode()
     if desiredOutputNode is not None:
+      #doing vtkMRMLNode::Copy breaks the references to the display and storage nodes. Grab them now so we can delete them.
+      displayNodes = [desiredOutputNode.GetNthDisplayNode(n) for n in range(desiredOutputNode.GetNumberOfDisplayNodes())]
+      storageNodes = [desiredOutputNode.GetNthStorageNode(n) for n in range(desiredOutputNode.GetNumberOfStorageNodes())]
+
       # copy into node, but keep name
       name = desiredOutputNode.GetName()
       desiredOutputNode.Copy(actualOutputNode)
       desiredOutputNode.SetName(name)
+
+      for n in itertools.chain(displayNodes, storageNodes):
+        slicer.mrmlScene.RemoveNode(n)
     slicer.mrmlScene.RemoveNode(actualOutputNode)
     if not desiredOutputNode.GetDisplayNode():
       desiredOutputNode.CreateDefaultDisplayNodes()
