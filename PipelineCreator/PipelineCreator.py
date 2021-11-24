@@ -194,12 +194,15 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       msgbox.exec()
 
   def _onRun(self):
-    modules = self._convertModuleButtonsToLogicInput()
-    inputNode = self.ui.cboxTestInput.currentNode()
     try:
+      modules = self._convertModuleButtonsToLogicInput()
+      inputNode = self.ui.cboxTestInput.currentNode()
+      desiredOutputNode = self.ui.cboxTestOutput.currentNode()
+      if desiredOutputNode is None and self._moduleButtons[-1].module.outputType is not None:
+        raise Exception("No output node for pipeline that has output")
+
       actualOutputNode = self.logic.runPipeline(modules, inputNode)
       if actualOutputNode is not None:
-        desiredOutputNode = self.ui.cboxTestOutput.currentNode()
         if desiredOutputNode is not None:
           #doing vtkMRMLNode::Copy breaks the references to the display and storage nodes. Grab them now so we can delete them.
           displayNodes = [desiredOutputNode.GetNthDisplayNode(n) for n in range(desiredOutputNode.GetNumberOfDisplayNodes())]
@@ -215,9 +218,10 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         slicer.mrmlScene.RemoveNode(actualOutputNode)
         if not desiredOutputNode.GetDisplayNode():
           desiredOutputNode.CreateDefaultDisplayNodes()
+          desiredOutputNode.GetDisplayNode().SetVisibility(True)
 
-        inputNode.GetDisplayNode().SetVisibility(False)
-        desiredOutputNode.GetDisplayNode().SetVisibility(True)
+        if self._moduleButtons[0].module.inputType is not None:
+          inputNode.GetDisplayNode().SetVisibility(False)
     except Exception as e:
       msgbox = qt.QMessageBox()
       msgbox.setWindowTitle("Error running pipeline")
@@ -227,14 +231,15 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
   def _modulesChanged(self):
     testable = self._verifyInputOutputFlow() and self._moduleButtons
     if testable:
-      self.ui.cboxTestInput.nodeTypes = (self._moduleButtons[0].module.inputType, )
+      self.ui.lblTestInput.setVisible(self._moduleButtons[0].module.inputType is not None)
+      self.ui.cboxTestInput.setVisible(self._moduleButtons[0].module.inputType is not None)
+      if self._moduleButtons[0].module.inputType is not None:
+        self.ui.cboxTestInput.nodeTypes = (self._moduleButtons[0].module.inputType, )
+
+      self.ui.lblTestOutput.setVisible(self._moduleButtons[-1].module.outputType is not None)
+      self.ui.cboxTestOutput.setVisible(self._moduleButtons[-1].module.outputType is not None)
       if self._moduleButtons[-1].module.outputType is not None:
-        self.ui.lblTestOutput.show()
-        self.ui.cboxTestOutput.show()
         self.ui.cboxTestOutput.nodeTypes = (self._moduleButtons[-1].module.outputType, )
-      else:
-        self.ui.lblTestOutput.hide()
-        self.ui.cboxTestOutput.hide()
     else:
       self.ui.cboxTestInput.nodeTypes = ()
       self.ui.cboxTestOutput.nodeTypes = ()
@@ -345,7 +350,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       moduleFormLayout = qt.QFormLayout()
       hlayout.addLayout(moduleFormLayout)
       inputTypeLabel = qt.QLabel("Input Type")
-      inputTypeLineEdit = qt.QLineEdit(module.inputType)
+      inputTypeLineEdit = qt.QLineEdit(str(module.inputType)) #str will make None -> 'None'
       inputTypeLineEdit.setReadOnly(True)
       moduleFormLayout.addRow(inputTypeLabel, inputTypeLineEdit)
 
@@ -384,7 +389,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       self._modulesChanged()
     except Exception as e:
           print ("Exception trying add module: '%s' for module '%s'\n    %s"
-            % (name, module.name, str(e)))
+            % (module.name, str(e)))
           raise
 
   def cleanup(self):
@@ -612,7 +617,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     else:
       self._allModules.append(_ModuleHolder(module))
 
-  def runPipeline(self, modules, inputNode):
+  def runPipeline(self, modules, inputNode=None):
     """
     modules is [(moduleName, {module-parameter-name: module-parameter-value})]
      List of tuples. Each tuple is the module name and a dictionary of fixed parameters.
@@ -624,7 +629,9 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
 
     fakeModule = collections.namedtuple("FakeModule", "deleteIntermediates")
     fakeSelf = fakeModule(deleteIntermediates=True)
-    return localsDict["Run"](fakeSelf, inputNode)
+    if self.moduleFromName(modules[0][0]).inputType is not None:
+      return localsDict["Run"](fakeSelf, inputNode)
+    return localsDict["Run"](fakeSelf)
 
   def createPipeline(self, pipelineName, outputDirectory, modules):
     """
@@ -715,7 +722,6 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     return newName
 
   _beginningOfRunMethod='''
-  nodes = [inputNode]
   def deleteIntermediates():
     if self.deleteIntermediates:
       shNode = slicer.mrmlScene.GetSubjectHierarchyNode()
@@ -742,9 +748,9 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     methodText = self._beginningOfRunMethod
 
     if self.moduleFromName(modules[0][0]).inputType is not None:
-      methodText = "def Run(self, inputNode):\n"
+      methodText = "def Run(self, inputNode):\n  nodes = [inputNode]\n"
     else:
-      methodText = "def Run(self):\n"
+      methodText = "def Run(self):\n  nodes = []\n"
     methodText += self._beginningOfRunMethod
     for moduleName, parameters in modules:
       moduleHolder = self.moduleFromName(moduleName)
@@ -785,7 +791,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       if moduleHolder.inputType is not None:
         methodText += "    nodes.append(nextPipelinePiece.Run(nodes[-1]))\n\n"
       else:
-        methodText += "    nodes.append(nextPipelinePiece.Run()))\n\n"
+        methodText += "    nodes.append(nextPipelinePiece.Run())\n\n"
     methodText += self._endOfRunMethod
     return methodText
 

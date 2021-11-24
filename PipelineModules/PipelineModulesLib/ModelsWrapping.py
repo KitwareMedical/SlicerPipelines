@@ -1,7 +1,11 @@
 from os import stat
 import slicer
 from PipelineCreator import slicerPipeline
-from .PipelineParameters import SaveFileParameter, StringComboBoxParameter
+from .PipelineParameters import (
+  OpenFileParameter,
+  SaveFileParameter,
+  StringComboBoxParameter
+)
 
 @slicerPipeline
 class SaveModelToFile(object):
@@ -9,17 +13,19 @@ class SaveModelToFile(object):
   def GetName():
     return "Save Model to File"
 
+  FileFilter = [
+    'Poly Data (*.vtk)',
+    'XML Poly Data (*.vtp)',
+    'STL (*.stl)',
+    'PLY (*.ply)',
+    'Wavefront OBJ (*.obj)',
+    'XML Unstructured Grid (*.vtu)',
+  ]
+
   @staticmethod
   def GetParameters():
     return [
-      ('Filename', SaveFileParameter(filter=[
-        'Poly Data (*.vtk)',
-        'XML Poly Data (*.vtp)',
-        'STL (*.stl)',
-        'PLY (*.ply)',
-        'Wavefront OBJ (*.obj)',
-        'XML Unstructured Grid (*.vtu)',
-        ])),
+      ('Filename', SaveFileParameter(caption="Save Model", filter=SaveModelToFile.FileFilter)),
       ('Coordinate System', StringComboBoxParameter(['LPS', 'RAS']))
     ]
 
@@ -58,3 +64,40 @@ class SaveModelToFile(object):
     store.WriteData(input)
 
     slicer.mrmlScene.RemoveNode(store)
+
+@slicerPipeline
+class LoadModelFromFile(object):
+  @staticmethod
+  def GetName():
+    return "Load Model from File"
+
+  FileFilter = SaveModelToFile.FileFilter
+
+  @staticmethod
+  def GetParameters():
+    return [
+      ('Filename', OpenFileParameter(caption='Load Model', filter=LoadModelFromFile.FileFilter)),
+    ]
+
+  @staticmethod
+  def GetInputType():
+    return None
+
+  @staticmethod
+  def GetOutputType():
+    return 'vtkMRMLModelNode'
+
+  @staticmethod
+  def GetDependencies():
+    return ['Models']
+
+  def __init__(self):
+    self._filename = None
+
+  def SetFilename(self, filename):
+    self._filename = filename
+  def GetFilename(self):
+    return self._filename
+
+  def Run(self):
+    return slicer.util.loadModel(self._filename)
