@@ -1,7 +1,8 @@
 import vtk
 import slicer
 from PipelineCreator import slicerPipeline
-from .PipelineParameters import FloatParameterWithSlider
+from .PipelineParameters import BooleanParameter, FloatParameterWithSlider, OpenFileParameter, SaveFileParameter
+from .Util import ScopedNode
 
 @slicerPipeline
 class ConvertModelToSegmentation(object):
@@ -72,3 +73,92 @@ class ConvertModelToSegmentation(object):
       #TODO: should we delete the volume node if the segmentation node is deleted?
 
       return segmentationNode
+
+
+@slicerPipeline
+class SaveSegmentationToFile(object):
+  @staticmethod
+  def GetName():
+    return "Save Segmentation to File"
+
+  FileFilter = [
+    'Segmentation (*.seg.nrrd)',
+    'Segmentation (*.nrrd)',
+  ]
+
+  @staticmethod
+  def GetParameters():
+    return [
+      ('Filename', SaveFileParameter(caption="Save Segmentation", filter=SaveSegmentationToFile.FileFilter)),
+      ('Crop To Minimum Extent', BooleanParameter(False)),
+    ]
+
+  @staticmethod
+  def GetInputType():
+    return 'vtkMRMLSegmentationNode'
+
+  @staticmethod
+  def GetOutputType():
+    return None
+
+  @staticmethod
+  def GetDependencies():
+    return ['Segmentations']
+
+  def __init__(self):
+      self._filename = None
+      self._cropToMinimumExtent = False
+
+  def SetFilename(self, filename):
+    self._filename = filename
+  def GetFilename(self):
+    return self._filename
+
+  def SetCropToMinimumExtent(self, cropToMinimumExtent):
+    self._cropToMinimumExtent = cropToMinimumExtent
+  def GetCropToMinimumExtent(self):
+    return self._cropToMinimumExtent
+
+  def Run(self, input):
+    with ScopedNode(slicer.vtkMRMLSegmentationStorageNode()) as store:
+      store.SetFileName(self._filename)
+      store.SetCropToMinimumExtent(self._cropToMinimumExtent)
+      store.WriteData(input)
+
+
+@slicerPipeline
+class LoadSegmentationFromFile(object):
+  @staticmethod
+  def GetName():
+    return "Load Segmentation from File"
+
+  FileFilter = SaveSegmentationToFile.FileFilter
+
+  @staticmethod
+  def GetParameters():
+    return [
+      ('Filename', OpenFileParameter(caption='Load Segmentation', filter=LoadSegmentationFromFile.FileFilter)),
+    ]
+
+  @staticmethod
+  def GetInputType():
+    return None
+
+  @staticmethod
+  def GetOutputType():
+    return 'vtkMRMLSegmentationNode'
+
+  @staticmethod
+  def GetDependencies():
+    return ['Segmentations']
+
+  def __init__(self):
+    self._filename = None
+
+  def SetFilename(self, filename):
+    self._filename = filename
+  def GetFilename(self):
+    return self._filename
+
+  def Run(self):
+    return slicer.util.loadSegmentation(self._filename)
