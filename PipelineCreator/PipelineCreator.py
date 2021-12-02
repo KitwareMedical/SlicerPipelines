@@ -750,7 +750,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     if self.moduleFromName(modules[0][0]).inputType is not None:
       methodText = "def Run(self, inputNode):\n  nodes = [inputNode]\n"
     else:
-      methodText = "def Run(self):\n  nodes = []\n"
+      methodText = "def Run(self):\n  nodes = [None]\n" #start with None so deletion works correctly
     methodText += self._beginningOfRunMethod
     for moduleName, parameters in modules:
       moduleHolder = self.moduleFromName(moduleName)

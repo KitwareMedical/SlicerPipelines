@@ -6,6 +6,8 @@ from .PipelineParameters import (
   SaveFileParameter,
   StringComboBoxParameter
 )
+from .Util import ScopedNode
+
 
 @slicerPipeline
 class SaveModelToFile(object):
@@ -58,12 +60,10 @@ class SaveModelToFile(object):
     return self._coordinateSystem
 
   def Run(self, input):
-    store = input.CreateDefaultStorageNode()
-    store.SetFileName(self._filename)
-    store.SetCoordinateSystem(slicer.vtkMRMLModelStorageNode.GetCoordinateSystemFromString(self._coordinateSystem))
-    store.WriteData(input)
-
-    slicer.mrmlScene.RemoveNode(store)
+    with ScopedNode(input.CreateDefaultStorageNode()) as store:
+      store.SetFileName(self._filename)
+      store.SetCoordinateSystem(slicer.vtkMRMLModelStorageNode.GetCoordinateSystemFromString(self._coordinateSystem))
+      store.WriteData(input)
 
 @slicerPipeline
 class LoadModelFromFile(object):
