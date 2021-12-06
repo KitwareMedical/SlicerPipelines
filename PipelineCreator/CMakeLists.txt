@@ -17,6 +17,7 @@ set(MODULE_PYTHON_RESOURCES
 
   Resources/PipelineTemplateModule/CMakeLists.txt.template
   Resources/PipelineTemplateModule/XXX.py.template
+  Resources/PipelineTemplateModule/CommandLineScripts/RunXXX.py.template
   Resources/PipelineTemplateModule/Resources/Icons/XXX.png
   Resources/PipelineTemplateModule/Resources/UI/XXX.ui
   )
