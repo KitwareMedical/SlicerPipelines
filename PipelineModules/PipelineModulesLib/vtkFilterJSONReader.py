@@ -49,8 +49,6 @@ def _createParamUI(param):
 def _passThroughSetMethod(param):
   name = _fixUpParameterName(param['name'])
   def func(self, value):
-    print("PassThruFunc: Set%s" % name)
-    print(f'getattr(self._filter, "Set{name}")({value})')
     getattr(self._filter, "Set"+name)(value)
   return ("Set"+name, func)
 
