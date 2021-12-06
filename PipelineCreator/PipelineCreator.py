@@ -1,5 +1,7 @@
+import collections
 import copy
 import inspect
+import itertools
 import keyword
 import os
 import pickle
@@ -113,6 +115,11 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
     self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
 
+    self.ui.cboxTestInput.setMRMLScene(slicer.mrmlScene)
+    self.ui.cboxTestOutput.setMRMLScene(slicer.mrmlScene)
+    self.ui.cboxTestInput.enabled = False
+    self.ui.cboxTestOutput.enabled = False
+
     # These connections ensure that whenever user changes some settings on the GUI, that is saved in the MRML scene
     # (in the selected parameter node).
     self.ui.leModuleName.textChanged.connect(self.updateParameterNodeFromGUI)
@@ -120,6 +127,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.btnFinalize.clicked.connect(self._onFinalize)
     self.ui.btnClear.clicked.connect(self._onClear)
     self.ui.btnBrowseOutputDirectory.clicked.connect(self._onBrowseOutputDirectory)
+    self.ui.btnRun.clicked.connect(self._onRun)
 
     #insert first insert button
     self._moduleUiStartIndex = self.uiLayout.count() - 1 # - 1 because we want to keep the vertical spacer as the last item
@@ -159,15 +167,19 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         buttonHolder.cbutton.hide()
         self.uiLayout.removeWidget(buttonHolder.cbutton)
       self._moduleButtons.clear()
+      self._modulesChanged()
 
-  def _onFinalize(self):
-    try:
-      modules = [
+  def _convertModuleButtonsToLogicInput(self):
+    return [
         (b.module.name, {
           paramName: param.GetValue() for paramName, param in b.parameters #TODO if param is fixed
         }) for b in self._moduleButtons
       ]
 
+
+  def _onFinalize(self):
+    try:
+      modules = self._convertModuleButtonsToLogicInput()
       moduleName = self.ui.leModuleName.text
       outputDirectory = self.ui.leOutputDirectory.text
       self.logic.createPipeline(moduleName, outputDirectory, modules)
@@ -181,6 +193,42 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       msgbox.setText(str(e))
       msgbox.exec()
 
+  def _onRun(self):
+    modules = self._convertModuleButtonsToLogicInput()
+    inputNode = self.ui.cboxTestInput.currentNode()
+    actualOutputNode = self.logic.runPipeline(modules, inputNode)
+
+    desiredOutputNode = self.ui.cboxTestOutput.currentNode()
+    if desiredOutputNode is not None:
+      #doing vtkMRMLNode::Copy breaks the references to the display and storage nodes. Grab them now so we can delete them.
+      displayNodes = [desiredOutputNode.GetNthDisplayNode(n) for n in range(desiredOutputNode.GetNumberOfDisplayNodes())]
+      storageNodes = [desiredOutputNode.GetNthStorageNode(n) for n in range(desiredOutputNode.GetNumberOfStorageNodes())]
+
+      # copy into node, but keep name
+      name = desiredOutputNode.GetName()
+      desiredOutputNode.Copy(actualOutputNode)
+      desiredOutputNode.SetName(name)
+
+      for n in itertools.chain(displayNodes, storageNodes):
+        slicer.mrmlScene.RemoveNode(n)
+    slicer.mrmlScene.RemoveNode(actualOutputNode)
+    if not desiredOutputNode.GetDisplayNode():
+      desiredOutputNode.CreateDefaultDisplayNodes()
+
+    inputNode.GetDisplayNode().SetVisibility(False)
+    desiredOutputNode.GetDisplayNode().SetVisibility(True)
+
+  def _modulesChanged(self):
+    testable = self._verifyInputOutputFlow() and self._moduleButtons
+    if testable:
+      self.ui.cboxTestInput.nodeTypes = (self._moduleButtons[0].module.inputType, )
+      self.ui.cboxTestOutput.nodeTypes = (self._moduleButtons[-1].module.outputType, )
+    else:
+      self.ui.cboxTestInput.nodeTypes = ()
+      self.ui.cboxTestOutput.nodeTypes = ()
+    self.ui.cboxTestInput.enabled = testable
+    self.ui.cboxTestOutput.enabled = testable
+    self.ui.btnRun.enabled = testable
 
   def _verifyInputOutputFlow(self):
     #update overall input/output
@@ -195,6 +243,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     badPalette = qt.QPalette()
     badPalette.setColor(qt.QPalette.Base, qt.QColor(255, 128, 128))
 
+    good = True
     for index, curButtonHolder in enumerate(self._moduleButtons):
       curModule = curButtonHolder.module
       if index == 0:
@@ -205,12 +254,14 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         if curModule.inputType != prevModule.outputType:
           curButtonHolder.inputTypeLineEdit.setPalette(badPalette)
           prevButtonHolder.outputTypeLineEdit.setPalette(badPalette)
+          good = False
         else:
           curButtonHolder.inputTypeLineEdit.setPalette(defaultPalette)
           prevButtonHolder.outputTypeLineEdit.setPalette(defaultPalette)
 
       if index == len(self._moduleButtons) - 1:
         curButtonHolder.outputTypeLineEdit.setPalette(defaultPalette)
+    return good
 
   def _onDeleteModule(self, buttonHolder):
     q = qt.QMessageBox()
@@ -223,7 +274,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       buttonHolder.cbutton.hide()
       self.uiLayout.removeWidget(buttonHolder.cbutton)
       self._moduleButtons.remove(buttonHolder)
-      self._verifyInputOutputFlow()
+      self._modulesChanged()
 
   def _onModuleMoveUp(self, buttonHolder):
     self._onModuleMove(buttonHolder, -1)
@@ -240,7 +291,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       self.uiLayout.removeWidget(buttonHolder.cbutton)
       self.uiLayout.insertWidget(self._moduleUiStartIndex + index + movement, buttonHolder.cbutton)
       buttonHolder.cbutton.show()
-      self._verifyInputOutputFlow()
+      self._modulesChanged()
 
   def _onInsertModuleButton(self, listIndex):
     popUp = SelectModulePopUp(self.logic.allModules, None, self.uiWidget)
@@ -308,7 +359,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       self._moduleButtons.insert(index, buttonHolder)
       self.uiLayout.insertWidget(self._moduleUiStartIndex + index, cbutton)
 
-      self._verifyInputOutputFlow()
+      self._modulesChanged()
     except Exception as e:
           print ("Exception trying add module: '%s' for module '%s'\n    %s"
             % (name, module.name, str(e)))
@@ -417,22 +468,44 @@ class _ModuleHolder:
 
   @property
   def name(self):
-    return self._module.GetName()
+    try:
+      return self._module.GetName()
+    except TypeError:
+      return self._module().GetName()
 
   @property
   def inputType(self):
-    return self._module.GetInputType()
+    try:
+      return self._module.GetInputType()
+    except TypeError:
+      return self._module().GetInputType()
 
   @property
   def outputType(self):
-    return self._module.GetOutputType()
+    try:
+      return self._module.GetOutputType()
+    except TypeError:
+      return self._module().GetOutputType()
 
   @property
-  def module(self):
-    return self._module
+  def dependencies(self):
+    try:
+      return self._module.GetDependencies()
+    except TypeError:
+      return self._module().GetDependencies()
+
+  @property
+  def moduleClass(self):
+    return self._module if inspect.isclass(self._module) else self._module.__class__
+
+  def moduleInstance(self):
+    return self._module if not inspect.isclass(self._module) else self._module()
 
   def MakeParameters(self):
-    return self._module.GetParameters()
+    try:
+      return self._module.GetParameters()
+    except TypeError:
+      return self._module().GetParameters()
 
   def updateParameterNodeFromSelf(self, param):
     param.SetParameter('name', self.name)
@@ -517,6 +590,20 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     else:
       self._allModules.append(_ModuleHolder(module))
 
+  def runPipeline(self, modules, inputNode):
+    """
+    modules is [(moduleName, {module-parameter-name: module-parameter-value})]
+     List of tuples. Each tuple is the module name and a dictionary of fixed parameters.
+     Not all of the modules parameters need to be fixed.
+    """
+    runMethodAsString = self._createRunMethod(modules)
+    localsDict = {}
+    exec(runMethodAsString, globals(), localsDict)
+
+    fakeModule = collections.namedtuple("FakeModule", "deleteIntermediates")
+    fakeSelf = fakeModule(deleteIntermediates=True)
+    return localsDict["Run"](fakeSelf, inputNode)
+
   def createPipeline(self, pipelineName, outputDirectory, modules):
     """
     modules is [(moduleName, {module-parameter-name: module-parameter-value})]
@@ -557,11 +644,17 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     if errorStr:
       raise Exception("Error creating pipeline: \n" + errorStr)
 
+    deps = ['PipelineCreator']
+    for moduleName, _ in modules:
+      module = self.moduleFromName(moduleName)
+      deps += module.dependencies
+    deps = sorted(list(set(deps))) # Remove duplicates
+
     replacements = {
       "MODULE_NAME": pipelineName,
       "MODULE_CATEGORIES": "['PipelineModules']", #TODO implement custom
       "MODULE_RUN_METHOD": self._createRunMethod(modules),
-      "MODULE_DEPENDENCIES": "['PipelineCreator']", #TODO auto populate this
+      "MODULE_DEPENDENCIES": str(deps),
       "MODULE_CONTRIBUTORS": "['PipelineCreator']", #TODO implement custom?
       "MODULE_SETUP_PIPELINE_UI_METHOD": self._createSetupPipelineUIMethod(modules),
       "MODULE_UPDATE_GUI_FROM_PARAMETER_NODE": "", #TODO implement as part of non-fixed parameters
@@ -594,15 +687,14 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     return newName
 
   def _createRunMethod(self, modules):
-    methodText = "def Run(self, input):\n" + \
-                 "  nodes = [input]\n"
+    methodText = "def Run(self, inputNode):\n" + \
+                 "  nodes = [inputNode]\n"
     for moduleName, parameters in modules:
       moduleHolder = self.moduleFromName(moduleName)
       #the register doesn't really care if it gets a class or an instance, so handle both cases
-      actualClass = moduleHolder.module if inspect.isclass(moduleHolder.module) else moduleHolder.module.__class__
-      methodText += "  # {stringClass}\n".format(stringClass=str(actualClass))
+      methodText += "  # {stringClass}\n".format(stringClass=str(moduleHolder.moduleClass))
       methodText += "  nextPipelinePiece = pickle.loads({pickledClass})()\n".format(
-          pickledClass=pickle.dumps(actualClass),
+          pickledClass=pickle.dumps(moduleHolder.moduleClass),
         )
 
       for parameterName, parameterValue in parameters.items():
@@ -631,12 +723,13 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
             )
       methodText += "  nodes.append(nextPipelinePiece.Run(nodes[-1]))\n\n"
     methodText += "  if self.deleteIntermediates:\n" + \
+                  "    shNode = slicer.mrmlScene.GetSubjectHierarchyNode()\n" + \
                   "    for node in nodes[1:-1]:\n" + \
                   "      # Only remove if it is not the actual input or output.\n" + \
                   "      # This is possible if the first or last pipeline module did\n" + \
                   "      # shallow copy\n" + \
                   "      if node is not nodes[0] and node is not nodes[-1]:\n" + \
-                  "        slicer.mrmlScene.RemoveNode(node)\n\n" + \
+                  "        shNode.RemoveItem(shNode.GetItemByDataNode(node))\n" + \
                   "  return nodes[-1]\n"
     return methodText
 
@@ -768,33 +861,39 @@ class PipelineCreatorTest(ScriptedLoadableModuleTest):
 
     #TODO create tests
 
-
-
-def CallAfterPipelineCreatorLoaded(callback):
-  """
-  Calls method after the pipeline creator is loaded. Is called right away
-  if the pipeline creator is already loaded.
-  """
-  try:
-    slicer.modules.pipelinecreator #this will throw if pipelinecreator has not been loaded yet
+def CallAfterAllTheseModulesLoaded(callback, modules):
+  #if all modules are loaded
+  if not set(modules).difference(set(slicer.app.moduleManager().modulesNames())):
     callback()
-  except AttributeError:
-    #we haven't loaded pipelinecreator yet, so register this when we do
-    def callbackWrapper(moduleName):
-      if "PipelineCreator" == moduleName:
+  else:
+    def callbackWrapper():
+      if not set(modules).difference(set(slicer.app.moduleManager().modulesNames())):
         callback()
+        slicer.app.moduleManager().moduleLoaded.disconnect(callbackWrapper)
     slicer.app.moduleManager().moduleLoaded.connect(callbackWrapper)
 
-def SingletonRegisterModule(module):
+def SingletonRegisterModule(module, moduleDependencies = None):
   """
   This method will handle correctly registering the module regardless of if
   the pipeline creator has already been loaded into slicer when it is called
   """
-  CallAfterPipelineCreatorLoaded(lambda: PipelineCreatorLogic().registerModule(module))
+  def register():
+    try:
+      PipelineCreatorLogic().registerModule(module)
+    except TypeError:
+      PipelineCreatorLogic().registerModule(module())
+  dependencies = moduleDependencies or []
+  dependencies.append('PipelineCreator')
+  CallAfterAllTheseModulesLoaded(register, dependencies)
 
 def slicerPipeline(classVar):
   """
   Class decorator to automatically register a class with the pipeline creator
   """
-  SingletonRegisterModule(classVar())
+  try:
+    dependencies = classVar.GetDependencies()
+  except AttributeError:
+    dependencies = []
+
+  SingletonRegisterModule(classVar, dependencies)
   return classVar

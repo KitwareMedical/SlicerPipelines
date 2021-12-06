@@ -1,0 +1,21 @@
+{
+  "name": "vtkQuadricDecimation",
+  "inputType": "vtkMRMLModelNode",
+  "outputType": "vtkMRMLModelNode",
+  "parameters": [
+    {
+      "name": "TargetReduction",
+      "type": "double",
+      "minimum": 0.0,
+      "value": 0.9,
+      "maximum": 1.0,
+      "singleStep": 0.01,
+      "decimals": 2
+    },
+    {
+      "name": "VolumePreservation",
+      "type": "boolean",
+      "value": false
+    }
+  ]
+}

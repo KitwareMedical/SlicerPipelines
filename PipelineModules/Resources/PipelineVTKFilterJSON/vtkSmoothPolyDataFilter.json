@@ -1,0 +1,46 @@
+{
+  "name": "vtkSmoothPolyDataFilter",
+  "inputType": "vtkMRMLModelNode",
+  "outputType": "vtkMRMLModelNode",
+  "parameters": [
+    {
+      "name": "RelaxationFactor",
+      "type": "double",
+      "minimum": 0.0,
+      "value": 0.8,
+      "maximum": 1.0,
+      "singleStep": 0.01,
+      "decimals": 2
+    },
+    {
+      "name": "BoundarySmoothing",
+      "type": "boolean",
+      "value": true
+    },
+    {
+      "name": "NumberOfIterations",
+      "type": "integer",
+      "minimum": 1,
+      "value": 30,
+      "maximum": 100
+    },
+    {
+      "name": "FeatureAngle",
+      "type": "double",
+      "minimum": 0.0,
+      "value": 45.0,
+      "maximum": 180.0,
+      "singleStep": 0.1,
+      "decimals": 1
+    },
+    {
+      "name": "EdgeAngle",
+      "type": "double",
+      "minimum": 0.0,
+      "value": 15.0,
+      "maximum": 180.0,
+      "singleStep": 0.1,
+      "decimals": 1
+    }
+  ]
+}

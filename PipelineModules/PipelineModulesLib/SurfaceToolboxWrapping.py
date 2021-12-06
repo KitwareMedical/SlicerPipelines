@@ -1,19 +1,19 @@
 import slicer
 from PipelineCreator import slicerPipeline
-from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameter, IntegerParameter
+from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameterWithSlider, IntegerParameterWithSlider
 from SurfaceToolbox import SurfaceToolboxLogic
 
 ###############################################################################
 class SurfaceToolboxBase(object):
   def __init__(self):
-    self._parameterNode = slicer.mrmlScene.CreateNodeByClass("vtkMRMLScriptedModuleNode")
-    slicer.mrmlScene.AddNode(self._parameterNode)
+    self._parameterNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScriptedModuleNode")
     self._surfaceToolboxLogic = SurfaceToolboxLogic()
     self._surfaceToolboxLogic.setDefaultParameters(self._parameterNode)
 
     self.verboseRun = False
 
-  def GetDependencies(self):
+  @staticmethod
+  def GetDependencies():
     return ['SurfaceToolbox']
 
   @property
@@ -43,36 +43,6 @@ class SurfaceToolboxBase(object):
 
     return outputModel
 
-
-###############################################################################
-@slicerPipeline
-class Decimation(SurfaceToolboxBase):
-  def __init__(self):
-    SurfaceToolboxBase.__init__(self)
-    self.parameterNode.SetParameter("decimation", "true")
-
-  def GetName(self):
-    return "SurfaceToolbox.Decimation"
-
-  @staticmethod
-  def GetParameters():
-    return [
-      ('Reduction', FloatParameter(value=0.8, minimum=0.0, maximum=1.0, singleStep=0.01)),
-      ('Boundary Deletion', BooleanParameter(True)),
-    ]
-
-  def SetReduction(self, reduction):
-    self.parameterNode.SetParameter("decimationReduction", str(reduction))
-
-  def GetReduction(self):
-    return float(self.parameterNode.GetParameter("decimationReduction"))
-
-  def SetBoundaryDeletion(self, boundaryDeletion):
-    self.parameterNode.SetParameter("decimationBoundaryDeletion", str(boundaryDeletion).lower())
-
-  def GetBoundaryDeletion(self):
-    return self.parameterNode.GetParameter("decimationBoundaryDeletion").lower() == "true"
-
 ###############################################################################
 @slicerPipeline
 class ScaleMesh(SurfaceToolboxBase):
@@ -87,9 +57,9 @@ class ScaleMesh(SurfaceToolboxBase):
   @staticmethod
   def GetParameters():
     return [
-      ('ScaleX', FloatParameter(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
-      ('ScaleY', FloatParameter(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
-      ('ScaleZ', FloatParameter(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
+      ('ScaleX', FloatParameterWithSlider(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
+      ('ScaleY', FloatParameterWithSlider(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
+      ('ScaleZ', FloatParameterWithSlider(value=0.5, minimum=0.0, maximum=50.0, singleStep=0.01)),
     ]
 
   def SetScaleX(self, scale):
@@ -107,44 +77,65 @@ class ScaleMesh(SurfaceToolboxBase):
 
 ###############################################################################
 @slicerPipeline
-class Smoothing(SurfaceToolboxBase):
+class TranslateMesh(SurfaceToolboxBase):
   def __init__(self):
     SurfaceToolboxBase.__init__(self)
-    self.parameterNode.SetParameter("smoothing", "true")
+    self.parameterNode.SetParameter("translate", "true")
 
   @staticmethod
   def GetName():
-    return "SurfaceToolbox.Smoothing"
+    return "SurfaceToolbox.TranslateMesh"
 
   @staticmethod
   def GetParameters():
     return [
-      ('Method', StringComboBoxParameter(['Laplace', 'Taubin'])),
-      ('Iterations', IntegerParameter(value=100, minimum=0, maximum=500, singleStep=1)),
-      ('Relaxation', FloatParameter(value=0.5, minimum=0.0, maximum=1.0, singleStep=0.1)),
-      ('Boundary Smoothing', BooleanParameter(True)),
+      ('TranslateX', FloatParameterWithSlider(value=0.5, minimum=-100.0, maximum=100.0, singleStep=0.01)),
+      ('TranslateY', FloatParameterWithSlider(value=0.5, minimum=-100.0, maximum=100.0, singleStep=0.01)),
+      ('TranslateZ', FloatParameterWithSlider(value=0.5, minimum=-100.0, maximum=100.0, singleStep=0.01)),
     ]
 
-  def SetMethod(self, method):
-    self.parameterNode.SetParameter("smoothingMethod", method)
-  def GetMethod(self):
-    return self.parameterNode.GetParameter("smoothingMethod")
+  def SetTranslateX(self, translate):
+    self.parameterNode.SetParameter("translateX", str(translate))
+  def GetTranslateX(self):
+    return float(self.parameterNode.GetParameter("translateX"))
+  def SetTranslateY(self, translate):
+    self.parameterNode.SetParameter("translateY", str(translate))
+  def GetTranslateY(self):
+    return float(self.parameterNode.GetParameter("translateY"))
+  def SetTranslateZ(self, translate):
+    self.parameterNode.SetParameter("translateZ", str(translate))
+  def GetTranslateZ(self):
+    return float(self.parameterNode.GetParameter("translateZ"))
 
-  def SetIterations(self, iterations):
-    self.parameterNode.SetParameter("smoothingLaplaceIterations", str(iterations))
-    self.parameterNode.SetParameter("smoothingTaubinIterations", str(iterations))
-  def GetIterations(self):
-    if self.GetMethod() == "Laplace":
-      return int(self.parameterNode.GetParameter("smoothingLaplaceIterations"))
-    else:
-      return int(self.parameterNode.GetParameter("smoothingTaubinIterations"))
+###############################################################################
+@slicerPipeline
+class MirrorMesh(SurfaceToolboxBase):
+  def __init__(self):
+    SurfaceToolboxBase.__init__(self)
+    self.parameterNode.SetParameter("mirror", "true")
 
-  def SetRelaxation(self, relaxation):
-    self.parameterNode.SetParameter("smoothingLaplaceRelaxation", str(relaxation))
-  def GetRelaxation(self):
-    return float(self.parameterNode.GetParameter("smoothingLaplaceRelaxation"))
+  @staticmethod
+  def GetName():
+    return "SurfaceToolbox.Mirror"
 
-  def SetBoundarySmoothing(self, boundarySmoothing):
-    self.parameterNode.SetParameter("smoothingBoundarySmoothing", "true" if boundarySmoothing else "false")
-  def GetBoundarySmoothing(self):
-    return self.parameterNode.GetParameter("smoothingBoundarySmoothing") == "true"
+  @staticmethod
+  def GetParameters():
+    return [
+      ('X Axis', BooleanParameter(False)),
+      ('Y Axis', BooleanParameter(False)),
+      ('Z Axis', BooleanParameter(False)),
+    ]
+
+  def SetXAxis(self, mirror):
+    self.parameterNode.SetParameter("mirrorX", "true" if mirror else "false")
+  def SetYAxis(self, mirror):
+    self.parameterNode.SetParameter("mirrorY", "true" if mirror else "false")
+  def SetZAxis(self, mirror):
+    self.parameterNode.SetParameter("mirrorZ", "true" if mirror else "false")
+
+  def GetXAxis(self):
+    return self.parameterNode.GetParameter("mirrorX") == "true"
+  def GetYAxis(self):
+    return self.parameterNode.GetParameter("mirrorY") == "true"
+  def GetZAxis(self):
+    return self.parameterNode.GetParameter("mirrorZ") == "true"

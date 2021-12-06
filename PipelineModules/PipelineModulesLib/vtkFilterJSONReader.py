@@ -4,7 +4,7 @@ import textwrap
 
 import slicer # Note: this import may show up as unused in linting, but it is needed for the exec calls to work
 import vtk # Note: this import may show up as unused in linting, but it is needed for the exec calls to work
-from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameter, IntegerParameter
+from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameterWithSlider, IntegerParameterWithSlider
 
 def _fixUpParameterName(parameterName):
   newName = parameterName.replace(" ", "")
@@ -12,8 +12,12 @@ def _fixUpParameterName(parameterName):
       raise Exception("Invalid name: '%s'" % newName)
   return newName
 
+def _boolParamUI(param):
+  return BooleanParameter(
+    defaultValue=param.get('value', False))
+
 def _doubleParamUI(param):
-  return FloatParameter(
+  return FloatParameterWithSlider(
     value=param.get('value', None),
     minimum=param.get('minimum', None),
     maximum=param.get('maximum', None),
@@ -21,12 +25,11 @@ def _doubleParamUI(param):
     decimals=param.get('decimals', None))
 
 def _integerParamUI(param):
-  return IntegerParameter(
+  return IntegerParameterWithSlider(
     value=param.get('value', None),
     minimum=param.get('minimum', None),
     maximum=param.get('maximum', None),
-    singleStep=param.get('singleStep', None),
-    decimals=param.get('decimals', None))
+    singleStep=param.get('singleStep', None))
 
 def _enumParamUI(param):
   return StringComboBoxParameter(param['values'])
@@ -39,6 +42,8 @@ def _createParamUI(param):
     return _integerParamUI(param)
   elif paramType in ("enum"):
     return _enumParamUI(param)
+  elif paramType in ("bool", "boolean"):
+    return _boolParamUI(param)
   raise Exception("Error loading vtk filter json: Unknown parameter type '%s'" % paramType)
 
 def _passThroughSetMethod(param):
@@ -63,6 +68,8 @@ def _createParamSetMethod(param):
     return _passThroughSetMethod(param)
   elif paramType in ("enum"):
     return _enumParamSetMethod(param)
+  elif paramType in ("bool", "boolean"):
+    return _passThroughSetMethod(param)
   raise Exception("Error loading vtk filter json: Unknown parameter type '%s'" % paramType)
 
 # Having the creation of the class in its own function is very important to
@@ -77,6 +84,10 @@ def _makeFilterClass(item):
       @staticmethod
       def GetName():
         return '{name}'
+
+      @staticmethod
+      def GetDependencies():
+        return []
 
       @staticmethod
       def GetInputType():

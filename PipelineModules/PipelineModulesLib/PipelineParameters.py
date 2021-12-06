@@ -1,12 +1,54 @@
 import qt
+import ctk
 
 class IntegerParameter(object):
+  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None, suffix=None):
+    self._spinbox = qt.QSpinBox()
+    if singleStep is not None:
+      self._spinbox.setSingleStep(singleStep)
+    if minimum is not None:
+      self._spinbox.setMinimum(minimum)
+    if maximum is not None:
+      self._spinbox.setMaximum(maximum)
+    if value is not None:
+      self._spinbox.value = value
+    if suffix is not None:
+      self._spinbox.suffix = suffix
+
+  def GetUI(self):
+    return self._spinbox
+
+  def GetValue(self):
+    return self._spinbox.value
+
+class FloatParameter(object):
+  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None, decimals=2, suffix=None):
+    self._spinbox = qt.QDoubleSpinBox()
+    self._spinbox.setDecimals(decimals)
+    if singleStep is not None:
+      self._spinbox.setSingleStep(singleStep)
+    if minimum is not None:
+      self._spinbox.setMinimum(minimum)
+    if maximum is not None:
+      self._spinbox.setMaximum(maximum)
+    if value is not None:
+      self._spinbox.value = value
+    if suffix is not None:
+      self._spinbox.suffix = suffix
+
+  def GetUI(self):
+    return self._spinbox
+
+  def GetValue(self):
+    return self._spinbox.value
+
+class IntegerParameterWithSlider(object):
   """
   Creates a parameter for getting integer values conforming to the
   PipelineCreator's needs that has a UI of both a slider and a spinbox
   in a horizontal layout.
   """
-  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None):
+  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None, suffix=None):
     self._hlayout = qt.QHBoxLayout()
     self._slider = qt.QSlider(qt.Qt.Horizontal)
     self._spinbox = qt.QSpinBox()
@@ -22,6 +64,8 @@ class IntegerParameter(object):
     if value is not None:
       self._spinbox.value = value
       self._slider.value = value
+    if suffix is not None:
+      self._spinbox.suffix = suffix
 
     self._spinbox.valueChanged.connect(self._onSpinboxChanged)
     self._slider.valueChanged.connect(self._onSliderChanged)
@@ -41,13 +85,13 @@ class IntegerParameter(object):
   def GetValue(self):
     return self._spinbox.value
 
-class FloatParameter(object):
+class FloatParameterWithSlider(object):
   """
   Creates a parameter for getting float values conforming to the
   PipelineCreator's needs that has a UI of both a slider and a spinbox
   in a horizontal layout.
   """
-  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None, decimals=2):
+  def __init__(self, value=None, minimum=None, maximum=None, singleStep=None, decimals=2, suffix=None):
     self._hlayout = qt.QHBoxLayout()
     self._slider = qt.QSlider(qt.Qt.Horizontal)
     self._spinbox = qt.QDoubleSpinBox()
@@ -64,6 +108,8 @@ class FloatParameter(object):
     if value is not None:
       self._spinbox.value = value
       self._slider.value = value * self._sliderMultiplier
+    if suffix is not None:
+      self._spinbox.suffix = suffix
 
     self._spinbox.valueChanged.connect(self._onSpinboxChanged)
     self._slider.valueChanged.connect(self._onSliderChanged)
@@ -112,3 +158,28 @@ class StringComboBoxParameter(object):
 
   def GetValue(self):
     return self._comboBox.currentText
+
+class FloatRangeParameter(object):
+  def __init__(self, minimumValue=None, maximumValue=None, minimum=None, maximum=None,
+               singleStep=None, decimals=None, suffix=None):
+    self._rangeWidget = ctk.ctkRangeWidget()
+    #important to set minimum/maximum before minimumValue/maximumValue
+    if minimum:
+      self._rangeWidget.minimum = minimum
+    if maximum:
+      self._rangeWidget.maximum = maximum
+    if minimumValue:
+      self._rangeWidget.minimumValue = minimumValue
+    if maximumValue:
+      self._rangeWidget.maximumValue = maximumValue
+    if singleStep:
+      self._rangeWidget.singleStep = singleStep
+    if decimals:
+      self._rangeWidget.decimals = decimals
+    if suffix:
+      self._rangeWidget.suffix = suffix
+
+  def GetUI(self):
+    return self._rangeWidget
+  def GetValue(self):
+    return (self._rangeWidget.minimumValue, self._rangeWidget.maximumValue)

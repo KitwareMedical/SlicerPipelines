@@ -1,0 +1,6 @@
+{
+  "name": "vtkCleanPolyData",
+  "inputType": "vtkMRMLModelNode",
+  "outputType": "vtkMRMLModelNode",
+  "parameters": []
+}

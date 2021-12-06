@@ -7,6 +7,8 @@ from slicer.util import VTKObservationMixin
 #import all the default wrappings. doing the import will register them with the pipeline creator
 from PipelineModulesLib import (
   PipelineParameters,
+  SegmentationsWrapping,
+  SegmentEditorWrapping,
   SurfaceToolboxWrapping,
   vtkFilterJSONReader,
 )
@@ -24,7 +26,7 @@ class PipelineModules(ScriptedLoadableModule):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "Pipeline Modules"
     self.parent.categories = ["Pipelines"]
-    self.parent.dependencies = ["PipelineCreator"]  # TODO: add here list of module names that this module requires
+    self.parent.dependencies = ["PipelineCreator", "SegmentEditor"]  # TODO: add here list of module names that this module requires
     self.parent.contributors = ["Connor Bowley (Kitware, Inc.)"]
     # TODO: update with short description of the module and a link to online module documentation
     self.parent.helpText = """

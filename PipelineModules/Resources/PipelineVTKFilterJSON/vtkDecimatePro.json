@@ -1,0 +1,56 @@
+{
+  "name": "vtkDecimatePro",
+  "inputType": "vtkMRMLModelNode",
+  "outputType": "vtkMRMLModelNode",
+  "parameters": [
+    {
+      "name": "TargetReduction",
+      "type": "double",
+      "minimum": 0.0,
+      "value": 0.9,
+      "maximum": 1.0,
+      "singleStep": 0.01,
+      "decimals": 2
+    },
+    {
+      "name": "PreserveTopology",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "BoundaryVertexDeletion",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "Splitting",
+      "type": "boolean",
+      "value": false
+    },
+    {
+      "name": "SplitAngle",
+      "type": "double",
+      "minimum": 0.0,
+      "value": 75.0,
+      "maximum": 180.0,
+      "singleStep": 0.1,
+      "decimals": 1
+    },
+    {
+      "name": "FeatureAngle",
+      "type": "double",
+      "minimum": 0.0,
+      "value": 15.0,
+      "maximum": 180.0,
+      "singleStep": 0.1,
+      "decimals": 1
+    },
+    {
+      "name": "Degree",
+      "type": "integer",
+      "minimum": 3,
+      "value": 25,
+      "maximum": 100
+    }
+  ]
+}
