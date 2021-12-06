@@ -5,6 +5,10 @@ set(MODULE_NAME PipelineCreator)
 set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
   Widgets/SelectModulePopUp.py
+  Widgets/PipelineModuleListWidget.py
+
+  _PipelineCreatorLib/ModuleHolder.py
+  _PipelineCreatorLib/ModuleTemplate.py
   )
 
 set(MODULE_PYTHON_RESOURCES

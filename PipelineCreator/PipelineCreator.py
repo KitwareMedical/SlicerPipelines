@@ -1,6 +1,5 @@
 import collections
 import copy
-import inspect
 import itertools
 import keyword
 import os
@@ -8,34 +7,16 @@ import pickle
 import shutil
 import textwrap
 import threading
-from string import Template
 
-import ctk
 import qt
 import slicer
 import vtk
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 
-from Widgets.SelectModulePopUp import SelectModulePopUp
-
-#
-# ModuleTemplate
-#
-class ModuleTemplate(Template):
-  """
-  Custom template class with special syntax
-  because CMake's variable syntax is the same
-  as the default Template's replace syntax
-  """
-  delimiter = '{{'
-  # only really want braced, but need both groups "named" and "braced" to exist
-  pattern = r"""\{\{(?:
-    (?P<escaped>\{) |
-    (?P<named>[_a-z][_a-z0-9]*)}} |
-    (?P<braced>[_a-z][_a-z0-9]*)}} |
-    (?P<invalid>)
-  )"""
+from Widgets.PipelineModuleListWidget import PipelineModuleListWidget
+from _PipelineCreatorLib.ModuleHolder import ModuleHolder
+from _PipelineCreatorLib.ModuleTemplate import ModuleTemplate
 
 #
 # PipelineCreator
@@ -63,10 +44,6 @@ This module was originally developed by Connor Bowley, Kitware Inc.
   def createLogic(self):
     return PipelineCreatorLogic()
 
-
-class _ModuleButtonHolder:
-  pass
-
 #
 # PipelineCreatorWidget
 #
@@ -85,7 +62,6 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.logic = None
     self._parameterNode = None
     self._updatingGUIFromParameterNode = False
-    self._moduleButtons = []
 
   def setup(self):
     """
@@ -129,15 +105,10 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.btnBrowseOutputDirectory.clicked.connect(self._onBrowseOutputDirectory)
     self.ui.btnRun.clicked.connect(self._onRun)
 
-    #insert first insert button
-    self._moduleUiStartIndex = self.uiLayout.count() - 1 # - 1 because we want to keep the vertical spacer as the last item
-
-    insertButton = qt.QPushButton()
-    insertButton.setText("Insert Module")
-    insertButton.clicked.connect(lambda: self._onInsertModuleButton(0))
-    # Note: self._moduleUiStartInded is still correct after this insert because this button will always be below
-    # the modules
-    self.uiLayout.insertWidget(self._moduleUiStartIndex, insertButton)
+    self._moduleListWidget = PipelineModuleListWidget()
+    self._moduleListWidget.setAvailableModules(self.logic.allModules)
+    self._moduleListWidget.modified.connect(self._modulesChanged)
+    self.uiLayout.addWidget(self._moduleListWidget)
 
     # Make sure parameter node is initialized (needed for module reload)
     self.initializeParameterNode()
@@ -162,24 +133,18 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       self.ui.leOutputDirectory.text = ""
       self.ui.leInputType.text = ""
       self.ui.leOutputType.text = ""
-      for buttonHolder in self._moduleButtons:
-        #remove from UI
-        buttonHolder.cbutton.hide()
-        self.uiLayout.removeWidget(buttonHolder.cbutton)
-      self._moduleButtons.clear()
-      self._modulesChanged()
+      self._moduleListWidget.clear()
 
-  def _convertModuleButtonsToLogicInput(self):
+  def _convertModuleListWidgetToLogicInput(self):
     return [
-        (b.module.name, {
-          paramTup[0]: paramTup[-1].GetValue() for paramTup in b.parameters #TODO if param is fixed
-        }) for b in self._moduleButtons
-      ]
-
+      (name, {
+        paramTup[0]: paramTup[-1].GetValue() for paramTup in parameters #TODO if param is fixed
+      }) for name, parameters in self._moduleListWidget.getAllParameters()
+    ]
 
   def _onFinalize(self):
     try:
-      modules = self._convertModuleButtonsToLogicInput()
+      modules = self._convertModuleListWidgetToLogicInput()
       moduleName = self.ui.leModuleName.text
       outputDirectory = self.ui.leOutputDirectory.text
       self.logic.createPipeline(moduleName, outputDirectory, modules)
@@ -195,10 +160,10 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
   def _onRun(self):
     try:
-      modules = self._convertModuleButtonsToLogicInput()
+      modules = self._convertModuleListWidgetToLogicInput()
       inputNode = self.ui.cboxTestInput.currentNode()
       desiredOutputNode = self.ui.cboxTestOutput.currentNode()
-      if desiredOutputNode is None and self._moduleButtons[-1].module.outputType is not None:
+      if desiredOutputNode is None and self._moduleListWidget.getOutputType() is not None:
         raise Exception("No output node for pipeline that has output")
 
       actualOutputNode = self.logic.runPipeline(modules, inputNode)
@@ -220,7 +185,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
           desiredOutputNode.CreateDefaultDisplayNodes()
           desiredOutputNode.GetDisplayNode().SetVisibility(True)
 
-        if self._moduleButtons[0].module.inputType is not None:
+        if self._moduleListWidget.getInputType() is not None:
           inputNode.GetDisplayNode().SetVisibility(False)
     except Exception as e:
       msgbox = qt.QMessageBox()
@@ -229,168 +194,27 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       msgbox.exec()
 
   def _modulesChanged(self):
-    testable = self._verifyInputOutputFlow() and self._moduleButtons
-    if testable:
-      self.ui.lblTestInput.setVisible(self._moduleButtons[0].module.inputType is not None)
-      self.ui.cboxTestInput.setVisible(self._moduleButtons[0].module.inputType is not None)
-      if self._moduleButtons[0].module.inputType is not None:
-        self.ui.cboxTestInput.nodeTypes = (self._moduleButtons[0].module.inputType, )
+    #update overall input/output
+    self.ui.leInputType.text = self._moduleListWidget.getInputType()
+    self.ui.leOutputType.text = self._moduleListWidget.getOutputType()
 
-      self.ui.lblTestOutput.setVisible(self._moduleButtons[-1].module.outputType is not None)
-      self.ui.cboxTestOutput.setVisible(self._moduleButtons[-1].module.outputType is not None)
-      if self._moduleButtons[-1].module.outputType is not None:
-        self.ui.cboxTestOutput.nodeTypes = (self._moduleButtons[-1].module.outputType, )
+    testable = self._moduleListWidget.good() and self._moduleListWidget.count() > 0
+    if testable:
+      self.ui.lblTestInput.setVisible(self._moduleListWidget.getInputType() is not None)
+      self.ui.cboxTestInput.setVisible(self._moduleListWidget.getInputType() is not None)
+      if self._moduleListWidget.getInputType() is not None:
+        self.ui.cboxTestInput.nodeTypes = (self._moduleListWidget.getInputType(), )
+
+      self.ui.lblTestOutput.setVisible(self._moduleListWidget.getOutputType() is not None)
+      self.ui.cboxTestOutput.setVisible(self._moduleListWidget.getOutputType() is not None)
+      if self._moduleListWidget.getOutputType() is not None:
+        self.ui.cboxTestOutput.nodeTypes = (self._moduleListWidget.getOutputType(), )
     else:
       self.ui.cboxTestInput.nodeTypes = ()
       self.ui.cboxTestOutput.nodeTypes = ()
     self.ui.cboxTestInput.enabled = testable
     self.ui.cboxTestOutput.enabled = testable
     self.ui.btnRun.enabled = testable
-
-  def _verifyInputOutputFlow(self):
-    #update overall input/output
-    if self._moduleButtons:
-      self.ui.leInputType.text = self._moduleButtons[0].module.inputType
-      self.ui.leOutputType.text = self._moduleButtons[-1].module.outputType
-
-    #check each input and output and color if good or bad
-    lineEdit = qt.QLineEdit()
-    defaultPalette = lineEdit.palette
-
-    badPalette = qt.QPalette()
-    badPalette.setColor(qt.QPalette.Base, qt.QColor(255, 128, 128))
-
-    good = True
-    for index, curButtonHolder in enumerate(self._moduleButtons):
-      curModule = curButtonHolder.module
-      if index == 0:
-        curButtonHolder.inputTypeLineEdit.setPalette(defaultPalette)
-      elif index > 0:
-        prevButtonHolder = self._moduleButtons[index - 1]
-        prevModule = prevButtonHolder.module
-        if curModule.inputType != prevModule.outputType:
-          curButtonHolder.inputTypeLineEdit.setPalette(badPalette)
-          prevButtonHolder.outputTypeLineEdit.setPalette(badPalette)
-          good = False
-        else:
-          curButtonHolder.inputTypeLineEdit.setPalette(defaultPalette)
-          prevButtonHolder.outputTypeLineEdit.setPalette(defaultPalette)
-
-      if index == len(self._moduleButtons) - 1:
-        curButtonHolder.outputTypeLineEdit.setPalette(defaultPalette)
-    return good
-
-  def _onDeleteModule(self, buttonHolder):
-    q = qt.QMessageBox()
-    q.setWindowTitle("Deleting module")
-    q.setText("Are you sure you want to delete module '%s'?" % buttonHolder.module.name)
-    q.addButton(qt.QMessageBox.Yes)
-    q.addButton(qt.QMessageBox.No)
-
-    if q.exec() == qt.QMessageBox.Yes:
-      buttonHolder.cbutton.hide()
-      self.uiLayout.removeWidget(buttonHolder.cbutton)
-      self._moduleButtons.remove(buttonHolder)
-      self._modulesChanged()
-      # for some reason the buttonHolder is not getting deleted from memory
-      # delete the parameters as a temp solution for some clean up of memory
-      # In truth, the reason this is here is so the bridge parameters from the CLIModuleWrapping
-      # get properly deleted, but this class shouldn't really know about that
-      buttonHolder.parameters = None
-
-  def _onModuleMoveUp(self, buttonHolder):
-    self._onModuleMove(buttonHolder, -1)
-
-  def _onModuleMoveDown(self, buttonHolder):
-    self._onModuleMove(buttonHolder, 1)
-
-  def _onModuleMove(self, buttonHolder, movement):
-    index = self._moduleButtons.index(buttonHolder)
-    if 0 <= index + movement < len(self._moduleButtons):
-      buttonHolder.cbutton.hide()
-      self._moduleButtons.pop(index)
-      self._moduleButtons.insert(index + movement, buttonHolder)
-      self.uiLayout.removeWidget(buttonHolder.cbutton)
-      self.uiLayout.insertWidget(self._moduleUiStartIndex + index + movement, buttonHolder.cbutton)
-      buttonHolder.cbutton.show()
-      self._modulesChanged()
-
-  def _onInsertModuleButton(self, listIndex):
-    popUp = SelectModulePopUp(self.logic.allModules, None, self.uiWidget)
-    popUp.accepted.connect(lambda: self._onPopUpAccepted(popUp))
-    popUp.open()
-
-  def _onPopUpAccepted(self, popUp):
-    try:
-      module = popUp.chosenModule
-      popUp.close()
-      popUp.destroy()
-
-      buttonHolder = _ModuleButtonHolder()
-      cbutton = ctk.ctkCollapsibleButton()
-      cbutton.setText(module.name)
-      cbutton.collapsed = False
-
-      hlayout = qt.QHBoxLayout()
-      cbutton.setLayout(hlayout)
-      
-      buttonVLayout = qt.QVBoxLayout()
-      hlayout.addLayout(buttonVLayout)
-      upButton = qt.QPushButton("↑")
-      upButton.clicked.connect(lambda: self._onModuleMoveUp(buttonHolder))
-      deleteButton = qt.QPushButton("X")
-      deleteButton.clicked.connect(lambda: self._onDeleteModule(buttonHolder))
-      downButton = qt.QPushButton("↓")
-      downButton.clicked.connect(lambda: self._onModuleMoveDown(buttonHolder))
-      buttonVLayout.addWidget(upButton)
-      buttonVLayout.addWidget(deleteButton)
-      buttonVLayout.addWidget(downButton)
-
-      #input type
-      moduleFormLayout = qt.QFormLayout()
-      hlayout.addLayout(moduleFormLayout)
-      inputTypeLabel = qt.QLabel("Input Type")
-      inputTypeLineEdit = qt.QLineEdit(str(module.inputType)) #str will make None -> 'None'
-      inputTypeLineEdit.setReadOnly(True)
-      moduleFormLayout.addRow(inputTypeLabel, inputTypeLineEdit)
-
-      #parameters
-      buttonHolder.parameters = module.MakeParameters()
-      for tup in buttonHolder.parameters:
-        try:
-          if len(tup) == 2: #name, ui
-            name, param = tup
-            moduleFormLayout.addRow(name, param.GetUI())
-          elif len(tup) == 3: #name, label, ui
-            _, label, param = tup
-            moduleFormLayout.addRow(label, param.GetUI())
-        except Exception as e:
-          raise Exception ("Exception trying to create parameter: '%s' for module '%s'\n    %s"
-            % (tup[0], module.name, str(e)))
-
-      #output type
-      outputTypeLabel = qt.QLabel("Output Type")
-      outputTypeLineEdit = qt.QLineEdit(str(module.outputType)) #str will make None -> 'None'
-      outputTypeLineEdit.setReadOnly(True)
-      moduleFormLayout.addRow(outputTypeLabel, outputTypeLineEdit)
-
-      if not self._moduleButtons:
-        index = 0
-      else:
-        index = len(self._moduleButtons)
-
-      buttonHolder.module = module
-      buttonHolder.cbutton = cbutton
-      buttonHolder.inputTypeLineEdit = inputTypeLineEdit
-      buttonHolder.outputTypeLineEdit = outputTypeLineEdit
-      self._moduleButtons.insert(index, buttonHolder)
-      self.uiLayout.insertWidget(self._moduleUiStartIndex + index, cbutton)
-
-      self._modulesChanged()
-    except Exception as e:
-          print ("Exception trying add module: '%s' for module '%s'\n    %s"
-            % (module.name, str(e)))
-          raise
 
   def cleanup(self):
     """
@@ -489,67 +313,6 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
     self._parameterNode.EndModify(wasModified)
 
-class _ModuleHolder:
-  def __init__(self, module = None):
-    self._module = module
-
-  @property
-  def name(self):
-    try:
-      return self._module.GetName()
-    except TypeError:
-      return self._module().GetName()
-
-  @property
-  def inputType(self):
-    try:
-      return self._module.GetInputType()
-    except TypeError:
-      return self._module().GetInputType()
-
-  @property
-  def outputType(self):
-    try:
-      return self._module.GetOutputType()
-    except TypeError:
-      return self._module().GetOutputType()
-
-  @property
-  def dependencies(self):
-    try:
-      return self._module.GetDependencies()
-    except TypeError:
-      return self._module().GetDependencies()
-
-  @property
-  def moduleClass(self):
-    return self._module if inspect.isclass(self._module) else self._module.__class__
-
-  def moduleInstance(self):
-    return self._module if not inspect.isclass(self._module) else self._module()
-
-  def MakeParameters(self):
-    try:
-      return self._module.GetParameters()
-    except TypeError:
-      return self._module().GetParameters()
-
-  def updateParameterNodeFromSelf(self, param):
-    param.SetParameter('name', self.name)
-    param.SetParameter('inputType', self.inputType)
-    param.SetParameter('outputType', self.outputType)
-    #TODO: implement this
-
-  def updateSelfFromParameterNode(self, param):
-    #TODO: implement this
-    pass
-
-  def __str__(self) -> str:
-    return self.name
-
-  def __repr__(self):
-    return self.__str__()
-
 
 #
 # PipelineCreatorLogic
@@ -612,10 +375,10 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     lowerName = module.GetName().lower()
     for i in range(len(self._allModules)):
       if lowerName < self._allModules[i].name.lower():
-        self._allModules.insert(i, _ModuleHolder(module))
+        self._allModules.insert(i, ModuleHolder(module))
         break
     else:
-      self._allModules.append(_ModuleHolder(module))
+      self._allModules.append(ModuleHolder(module))
 
   def runPipeline(self, modules, inputNode=None):
     """
