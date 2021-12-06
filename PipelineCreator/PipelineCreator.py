@@ -380,7 +380,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     else:
       self._allModules.append(ModuleHolder(module))
 
-  def runPipeline(self, modules, inputNode=None):
+  def runPipeline(self, modules, inputNode):
     """
     modules is [(moduleName, {module-parameter-name: module-parameter-value})]
      List of tuples. Each tuple is the module name and a dictionary of fixed parameters.
@@ -392,9 +392,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
 
     fakeModule = collections.namedtuple("FakeModule", "deleteIntermediates")
     fakeSelf = fakeModule(deleteIntermediates=True)
-    if self.moduleFromName(modules[0][0]).inputType is not None:
-      return localsDict["Run"](fakeSelf, inputNode)
-    return localsDict["Run"](fakeSelf)
+    return localsDict["Run"](fakeSelf, inputNode)
 
   def createPipeline(self, pipelineName, outputDirectory, modules):
     """
@@ -442,12 +440,6 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       deps += module.dependencies
     deps = sorted(list(set(deps))) # Remove duplicates
 
-    firstModule = self.moduleFromName(modules[0][0])
-    lastModule = self.moduleFromName(modules[-1][0])
-
-    inputType = "'%s'" % firstModule.inputType if firstModule.inputType is not None else "None"
-    outputType = "'%s'" % lastModule.outputType if lastModule.outputType is not None else "None"
-
     replacements = {
       "MODULE_NAME": pipelineName,
       "MODULE_CATEGORIES": "['PipelineModules']", #TODO implement custom
@@ -458,23 +450,18 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       "MODULE_UPDATE_GUI_FROM_PARAMETER_NODE": "", #TODO implement as part of non-fixed parameters
       "MODULE_UPDATE_PARAMETER_NODE_FROM_GUI": "", #TODO implement as part of non-fixed parameters
       "MODULE_LOGIC_SET_METHODS": "", #TODO implement as part of non-fixed parameters
-      "MODULE_INPUT_TYPE": inputType,
-      "MODULE_OUTPUT_TYPE": outputType,
+      "MODULE_INPUT_TYPE": self.moduleFromName(modules[0][0]).inputType,
+      "MODULE_OUTPUT_TYPE": self.moduleFromName(modules[-1][0]).outputType,
     }
 
     self._makeModule(outputDirectory, replacements)
 
   #this is anticipated to be needed for non-fixed parameters
   def _createSetupPipelineUIMethod(self, modules):
-    inputType = self.moduleFromName(modules[0][0]).inputType
-    outputType = self.moduleFromName(modules[-1][0]).outputType
     ret = """
     def setupPipelineUI(self):
       pass
-    """.format(
-      inputType=inputType,
-      outputType=outputType,
-    )
+    """
     return textwrap.dedent(ret).strip()
 
   @staticmethod
@@ -485,6 +472,8 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     return newName
 
   _beginningOfRunMethod='''
+def Run(self, inputNode):
+  nodes = [inputNode]
   def deleteIntermediates():
     if self.deleteIntermediates:
       shNode = slicer.mrmlScene.GetSubjectHierarchyNode()
@@ -492,7 +481,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
         # Only remove if it is not the actual input or output.
         # This is possible if the first or last pipeline module did
         # shallow copy
-        if node is not None and node is not nodes[0] and node is not nodes[-1]:
+        if node is not nodes[0] and node is not nodes[-1]:
           itemId = shNode.GetItemByDataNode(node)
           if itemId != 0:
             shNode.RemoveItem(itemId)
@@ -501,7 +490,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
 
   _endOfRunMethod ='''
     deleteIntermediates()
-    return nodes[-1] #Note: this may legitimately return None
+    return nodes[-1]
   except:
     deleteIntermediates()
     raise
@@ -509,12 +498,6 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
 
   def _createRunMethod(self, modules):
     methodText = self._beginningOfRunMethod
-
-    if self.moduleFromName(modules[0][0]).inputType is not None:
-      methodText = "def Run(self, inputNode):\n  nodes = [inputNode]\n"
-    else:
-      methodText = "def Run(self):\n  nodes = [None]\n" #start with None so deletion works correctly
-    methodText += self._beginningOfRunMethod
     for moduleName, parameters in modules:
       moduleHolder = self.moduleFromName(moduleName)
       #the register doesn't really care if it gets a class or an instance, so handle both cases
@@ -551,10 +534,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
               pickledValue=pickle.dumps(parameterValue),
               strValue=strValue,
             )
-      if moduleHolder.inputType is not None:
-        methodText += "    nodes.append(nextPipelinePiece.Run(nodes[-1]))\n\n"
-      else:
-        methodText += "    nodes.append(nextPipelinePiece.Run())\n\n"
+      methodText += "    nodes.append(nextPipelinePiece.Run(nodes[-1]))\n\n"
     methodText += self._endOfRunMethod
     return methodText
 
