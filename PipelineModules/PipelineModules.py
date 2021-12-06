@@ -7,7 +7,6 @@ from slicer.util import VTKObservationMixin
 #import all the default wrappings. doing the import will register them with the pipeline creator
 from PipelineModulesLib import (
   CLIModuleWrapping,
-  ModelsWrapping,
   PipelineParameters,
   SegmentationsWrapping,
   SegmentEditorWrapping,

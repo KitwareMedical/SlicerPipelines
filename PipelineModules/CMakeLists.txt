@@ -5,7 +5,6 @@ set(MODULE_NAME PipelineModules)
 set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
   PipelineModulesLib/CLIModuleWrapping.py
-  PipelineModulesLib/ModelsWrapping.py
   PipelineModulesLib/PipelineParameters.py
   PipelineModulesLib/SegmentationsWrapping.py
   PipelineModulesLib/SegmentEditorWrapping.py
