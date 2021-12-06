@@ -95,6 +95,9 @@ class PipelineModuleListWidget(qt.QWidget):
   def setAvailableModules(self, availableModules):
     self._availableModules = availableModules
 
+  def moduleAt(self, index):
+    return self._moduleWidgets[index].module
+
   def setErrorPalette(self, palette):
     self._errorPalette = palette
   def getErrorPalette(self):
