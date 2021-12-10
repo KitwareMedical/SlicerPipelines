@@ -62,6 +62,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.logic = None
     self._parameterNode = None
     self._updatingGUIFromParameterNode = False
+    self._runPipelineProgressDialog = None
 
   def setup(self):
     """
@@ -84,6 +85,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     # Create logic class. Logic implements all computations that should be possible to run
     # in batch mode, without a graphical user interface.
     self.logic = PipelineCreatorLogic()
+    self.logic.setPipelineProgressCallback(self._runPipelineProgress)
 
     # Connections
 
@@ -167,6 +169,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       if desiredOutputNode is None and self._moduleListWidget.getOutputType() is not None:
         raise Exception("No output node for pipeline that has output")
 
+      self._runPipelineProgressDialog = slicer.util.createProgressDialog()
       actualOutputNode = self.logic.runPipeline(modules, inputNode)
       if actualOutputNode is not None:
         if desiredOutputNode is not None:
@@ -314,6 +317,15 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
     self._parameterNode.EndModify(wasModified)
 
+  def _runPipelineProgress(self, pipelineProgress):
+    if self._runPipelineProgressDialog is not None:
+      self._runPipelineProgressDialog.labelText = pipelineProgress.currentPipelinePieceName
+      self._runPipelineProgressDialog.value = pipelineProgress.progress * 100
+      slicer.app.processEvents()
+
+
+PipelineProgress = collections.namedtuple("PiplineProgress",
+  "progress currentPipelinePieceName currentPipelinePieceNumber numberOfPieces")
 
 #
 # PipelineCreatorLogic
@@ -349,6 +361,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       self.isSingletonParameterNode = False
 
     self._pipeline = []
+    self._runPipelineProgressCb = None
 
   
   def setDefaultParameters(self, parameterNode):
@@ -386,14 +399,28 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     modules is [(moduleName, {module-parameter-name: module-parameter-value})]
      List of tuples. Each tuple is the module name and a dictionary of fixed parameters.
      Not all of the modules parameters need to be fixed.
+    This method is not thread safe?
     """
-    runMethodAsString = self._createRunMethod(modules)
-    localsDict = {}
-    exec(runMethodAsString, globals(), localsDict)
+    replacements = self._makeReplacements("UnfinalizedPipeline", modules)
+    moduleTemplateFile = os.path.join(self._getPipelineTemplateModulePath(), 'XXX.py.template')
+    moduleCode = self._makeFileContent(moduleTemplateFile, replacements)
 
-    fakeModule = collections.namedtuple("FakeModule", "deleteIntermediates")
-    fakeSelf = fakeModule(deleteIntermediates=True)
-    return localsDict["Run"](fakeSelf, inputNode)
+    #prevent the unfinalized pipeline from registering itself with the pipeline creator
+    moduleCode = moduleCode.replace('@slicerPipeline', '# @slicerPipeline - unfinalized pipeline')
+
+    localsDict = {}
+    exec(moduleCode, globals(), localsDict)
+
+    pipelineLogic = localsDict['%sLogic' % replacements['MODULE_NAME']]()
+    pipelineLogic.SetProgressCallback(self._runPipelineProgress)
+    return pipelineLogic.Run(inputNode)
+
+  def setPipelineProgressCallback(self, cb):
+    self._runPipelineProgressCb = cb
+
+  def _runPipelineProgress(self, pipelineProgress):
+    if self._runPipelineProgressCb is not None:
+      self._runPipelineProgressCb(pipelineProgress)
 
   def createPipeline(self, pipelineName, outputDirectory, modules):
     """
@@ -435,16 +462,21 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     if errorStr:
       raise Exception("Error creating pipeline: \n" + errorStr)
 
+    replacements = self._makeReplacements(pipelineName, modules)
+    self._makeModule(outputDirectory, replacements)
+
+  def _makeReplacements(self, pipelineName, modules):
     deps = ['PipelineCreator']
     for moduleName, _ in modules:
       module = self.moduleFromName(moduleName)
       deps += module.dependencies
     deps = sorted(list(set(deps))) # Remove duplicates
 
-    replacements = {
+    return {
       "MODULE_NAME": pipelineName,
       "MODULE_CATEGORIES": "['PipelineModules']", #TODO implement custom
       "MODULE_RUN_METHOD": self._createRunMethod(modules),
+      "MODULE_COUNT": len(modules),
       "MODULE_DEPENDENCIES": str(deps),
       "MODULE_CONTRIBUTORS": "['PipelineCreator']", #TODO implement custom?
       "MODULE_SETUP_PIPELINE_UI_METHOD": self._createSetupPipelineUIMethod(modules),
@@ -454,8 +486,6 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       "MODULE_INPUT_TYPE": self.moduleFromName(modules[0][0]).inputType,
       "MODULE_OUTPUT_TYPE": self.moduleFromName(modules[-1][0]).outputType,
     }
-
-    self._makeModule(outputDirectory, replacements)
 
   #this is anticipated to be needed for non-fixed parameters
   def _createSetupPipelineUIMethod(self, modules):
@@ -475,6 +505,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
   _beginningOfRunMethod='''
 def Run(self, inputNode):
   nodes = [inputNode]
+  currentPipelinePieceNumber=0
   def deleteIntermediates():
     if self.deleteIntermediates:
       shNode = slicer.mrmlScene.GetSubjectHierarchyNode()
@@ -490,6 +521,7 @@ def Run(self, inputNode):
 '''.lstrip('\n')
 
   _endOfRunMethod ='''
+    self._Progress(nextPipelinePiece.GetName(), currentPipelinePieceNumber)
     deleteIntermediates()
     return nodes[-1]
   except:
@@ -506,6 +538,7 @@ def Run(self, inputNode):
       methodText += "    nextPipelinePiece = pickle.loads({pickledClass})()\n".format(
           pickledClass=pickle.dumps(moduleHolder.moduleClass),
         )
+      methodText += "    self._Progress(nextPipelinePiece.GetName(), currentPipelinePieceNumber)\n"
 
       for parameterTup in parameters.items():
         if len(parameterTup) == 2:
@@ -535,7 +568,8 @@ def Run(self, inputNode):
               pickledValue=pickle.dumps(parameterValue),
               strValue=strValue,
             )
-      methodText += "    nodes.append(nextPipelinePiece.Run(nodes[-1]))\n\n"
+      methodText += "    nodes.append(nextPipelinePiece.Run(nodes[-1]))\n"
+      methodText += "    currentPipelinePieceNumber += 1\n\n"
     methodText += self._endOfRunMethod
     return methodText
 
@@ -562,8 +596,7 @@ def Run(self, inputNode):
       MODULE_UPDATE_PARAMETER_NODE_FROM_GUI - Python code to update parameter node from GUI.
         Expect first line to have no indentation. This function will take care of proper indentation within the template file.
         You still need to do indentation on things like if statements or def methods.
-      MODULE_RUN_METHOD - Body of run method.
-        Expect first line to have no indentation. This function will take care of proper indentation within the template file.
+      MODULE_RUN_METHOD - Expect first line to have no indentation. This function will take care of proper indentation within the template file.
         You still need to do indentation on things like if statements or def methods.
       MODULE_LOGIC_SET_METHODS - Set of full python methods to set any parameters to the module.
         Expect first line to have no indentation. This function will take care of proper indentation within the template file.
@@ -571,19 +604,11 @@ def Run(self, inputNode):
       MODULE_INPUT_TYPE - The modules input type
       MODULE_OUTPUT_TYPE - The modules output type
     """
-    replacementsCopy = copy.deepcopy(replacements)
-    itemsThatNeedFixedIndentation = [
-      'MODULE_SETUP_PIPELINE_UI_METHOD',
-      'MODULE_RUN_METHOD',
-      'MODULE_LOGIC_SET_METHODS',
-      'MODULE_UPDATE_GUI_FROM_PARAMETER_NODE',
-      'MODULE_UPDATE_PARAMETER_NODE_FROM_GUI',
-    ]
 
     join = os.path.join
     normpath = os.path.normpath
     relpath = os.path.relpath
-    pipelineTemplateModulePath = normpath(self.resourcePath('PipelineTemplateModule'))
+    pipelineTemplateModulePath = self._getPipelineTemplateModulePath()
     for rootdir, dirs, files in os.walk(pipelineTemplateModulePath):
       # Create any directories
       for directory in dirs:
@@ -601,21 +626,39 @@ def Run(self, inputNode):
           shutil.copyfile(fullFilePath, outputFilePath)
         else:
           outputFilePath = join(outputDirectory, relativeFilePath[:-len('.template')])
-          with open(fullFilePath, 'r') as inFile:
-            content = inFile.read()
-            templateString = ModuleTemplate(content)
-
-          # Fixup indentation on the items we promised to
-          for item in itemsThatNeedFixedIndentation:
-            indentation = self._getIndentation(content, "{{" + item + "}}")
-            replacementsCopy[item] = textwrap.indent(replacements[item], indentation)
-            #we have indented everything, but the first line is already indented the .py
-            #file, so unindent that
-            replacementsCopy[item] = replacementsCopy[item][len(indentation):]
-
-          filledOutContent = templateString.substitute(replacementsCopy)
+          filledOutContent = self._makeFileContent(fullFilePath, replacements)
           with open(outputFilePath, 'w') as outFile:
             outFile.write(filledOutContent)
+
+  def _getPipelineTemplateModulePath(self):
+    return os.path.normpath(self.resourcePath('PipelineTemplateModule'))
+
+
+  def _makeFileContent(self, filename, replacements):
+    with open(filename, 'r') as inFile:
+      content = inFile.read()
+    templateString = ModuleTemplate(content)
+
+    itemsThatNeedFixedIndentation = [
+      'MODULE_SETUP_PIPELINE_UI_METHOD',
+      'MODULE_RUN_METHOD',
+      'MODULE_LOGIC_SET_METHODS',
+      'MODULE_UPDATE_GUI_FROM_PARAMETER_NODE',
+      'MODULE_UPDATE_PARAMETER_NODE_FROM_GUI',
+    ]
+
+    # deep copy the replacements dictionary so we aren't actually changing it
+    replacementsCopy = copy.deepcopy(replacements)
+    # Fixup indentation on the items we promised to
+    for item in itemsThatNeedFixedIndentation:
+      indentation = self._getIndentation(content, "{{" + item + "}}")
+      replacementsCopy[item] = textwrap.indent(replacements[item], indentation)
+      #we have indented everything, but the first line is already indented the .py
+      #file, so unindent that
+      replacementsCopy[item] = replacementsCopy[item][len(indentation):]
+
+    filledOutContent = templateString.substitute(replacementsCopy)
+    return filledOutContent
 
 
   @staticmethod
