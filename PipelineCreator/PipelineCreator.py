@@ -108,7 +108,8 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self._moduleListWidget = PipelineModuleListWidget()
     self._moduleListWidget.setAvailableModules(self.logic.allModules)
     self._moduleListWidget.modified.connect(self._modulesChanged)
-    self.uiLayout.addWidget(self._moduleListWidget)
+    # insert at count-1 because we want to keep the spacer on the bottom
+    self.uiLayout.insertWidget(self.uiLayout.count() - 1, self._moduleListWidget)
 
     # Make sure parameter node is initialized (needed for module reload)
     self.initializeParameterNode()
