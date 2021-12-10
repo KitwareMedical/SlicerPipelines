@@ -6,7 +6,7 @@ import pickle
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
-from PipelineCreator import slicerPipeline
+from PipelineCreator import PipelineProgress, slicerPipeline
 
 class {{MODULE_NAME}}(ScriptedLoadableModule):
   def __init__(self, parent):
@@ -197,6 +197,7 @@ class {{MODULE_NAME}}Logic(ScriptedLoadableModuleLogic):
     """
     ScriptedLoadableModuleLogic.__init__(self)
     self.deleteIntermediates = True
+    self._progressCallback = None
 
   @staticmethod
   def GetName():
@@ -218,6 +219,21 @@ class {{MODULE_NAME}}Logic(ScriptedLoadableModuleLogic):
   @staticmethod
   def GetParameters():
     return []
+
+  def GetNumberOfPieces(self):
+    return {{MODULE_COUNT}}
+
+  def SetProgressCallback(self, cb):
+    self._progressCallback = cb
+
+  def _Progress(self, moduleName, currentPipelinePieceNumber):
+    if self._progressCallback:
+      self._progressCallback(PipelineProgress(
+        progress=currentPipelinePieceNumber / self.GetNumberOfPieces(),
+        currentPipelinePieceName=moduleName,
+        currentPipelinePieceNumber=currentPipelinePieceNumber+1,
+        numberOfPieces=self.GetNumberOfPieces(),
+        ))
 
   {{MODULE_RUN_METHOD}}
 
