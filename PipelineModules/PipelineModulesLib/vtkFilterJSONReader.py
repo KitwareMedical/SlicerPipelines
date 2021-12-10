@@ -74,7 +74,6 @@ def _createParamSetMethod(param):
 # making sure each call we get a brand new class and aren't overwriting anything
 def _makeFilterClass(item):
   filtername = _fixUpParameterName(item['name'])
-  parameterUIs = [(p['name'], _createParamUI(p)) for p in item['parameters']]
   parameterSetMethods = [_createParamSetMethod(p) for p in item['parameters']]
 
   classDefinition = textwrap.dedent('''
@@ -118,7 +117,7 @@ def _makeFilterClass(item):
 
   @staticmethod
   def GetParameters():
-    return parameterUIs
+    return [(p['name'], _createParamUI(p)) for p in item['parameters']]
   setattr(VTKFilter, "GetParameters", GetParameters)
 
   for methodName, method in parameterSetMethods:
