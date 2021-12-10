@@ -145,6 +145,26 @@ class BooleanParameter(object):
   def GetValue(self):
     return self._checkbox.checked
 
+class StringParameter(object):
+  """
+  Creates a parameter for getting an arbitrary string parameter.
+  This class conforms to the PipelineCreator's needs.
+  """
+  def __init__(self, defaultText=None, placeholderText=None, maxLength=None):
+    self._lineEdit = qt.QLineEdit()
+    if defaultText is not None:
+      self._lineEdit.text = defaultText
+    if placeholderText is not None:
+      self._lineEdit.placeholderText = placeholderText
+    if maxLength is not None:
+      self._lineEdit.setMaxLength(maxLength)
+
+  def GetUI(self):
+    return self._lineEdit
+
+  def GetValue(self):
+    return self._lineEdit.text
+
 class StringComboBoxParameter(object):
   """
   Creates a parameter for getting a string value from a fixed set of string values.
