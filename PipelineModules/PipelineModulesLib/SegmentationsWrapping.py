@@ -1,22 +1,27 @@
+import copy
 import vtk
 import slicer
 from PipelineCreator import slicerPipeline
-from .PipelineParameters import FloatParameterWithSlider
+from .PipelineParameters import FloatParameterWithSlider, StringParameter
 
 @slicerPipeline
 class ConvertModelToSegmentation(object):
+    DefaultVolumeName = "PipelineSegmentationVolume"
+    DefaultVolumeSpacing = [0.2, 0.2, 0.2]
+    DefaultVolumeMargin = [10.0, 10.0, 10.0]
     @staticmethod
     def GetName():
       return "ConvertModelToSegmentation"
     @staticmethod
     def GetParameters():
       return [
-        ('Volume Spacing X', FloatParameterWithSlider(value=0.2, minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
-        ('Volume Spacing Y', FloatParameterWithSlider(value=0.2, minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
-        ('Volume Spacing Z', FloatParameterWithSlider(value=0.2, minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
-        ('Volume Margin X', FloatParameterWithSlider(value=10.0, minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
-        ('Volume Margin Y', FloatParameterWithSlider(value=10.0, minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
-        ('Volume Margin Z', FloatParameterWithSlider(value=10.0, minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
+        ('Volume Name', StringParameter(defaultText=ConvertModelToSegmentation.DefaultVolumeName, placeholderText="Enter a name")),
+        ('Volume Spacing X', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeSpacing[0], minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
+        ('Volume Spacing Y', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeSpacing[1], minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
+        ('Volume Spacing Z', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeSpacing[2], minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
+        ('Volume Margin X', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeMargin[0], minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
+        ('Volume Margin Y', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeMargin[1], minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
+        ('Volume Margin Z', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeMargin[2], minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
       ]
     @staticmethod
     def GetInputType():
@@ -29,8 +34,12 @@ class ConvertModelToSegmentation(object):
       return ['Segmentations']
 
     def __init__(self):
-      self._volumeSpacing = [0.2]*3
-      self._volumeMargin = [10.0]*3
+      self._volumeName = self.DefaultVolumeName
+      self._volumeSpacing = copy.deepcopy(ConvertModelToSegmentation.DefaultVolumeSpacing)
+      self._volumeMargin = copy.deepcopy(ConvertModelToSegmentation.DefaultVolumeMargin)
+
+    def SetVolumeName(self, name):
+      self._volumeName = name
 
     def SetVolumeSpacingX(self, spacing):
       self._volumeSpacing[0] = spacing
@@ -61,6 +70,7 @@ class ConvertModelToSegmentation(object):
       imageData.AllocateScalars(vtk.VTK_UNSIGNED_CHAR, 1)
       imageData.GetPointData().GetScalars().Fill(0)
       referenceVolumeNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
+      referenceVolumeNode.SetName(self._volumeName)
       referenceVolumeNode.SetOrigin(imageOrigin)
       referenceVolumeNode.SetSpacing(self._volumeSpacing)
       referenceVolumeNode.SetAndObserveImageData(imageData)
