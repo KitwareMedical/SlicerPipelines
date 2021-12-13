@@ -61,7 +61,6 @@ class SelectModulePopUp(qt.QDialog):
     self._updateListWidget()
 
   def _updateListWidget(self):
-    inputType = self.cboxInputType.currentText
     self.listWidget.clear()
     self.leOutputType.setText("")
     self.okButton.setEnabled(False)
