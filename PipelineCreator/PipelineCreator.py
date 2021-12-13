@@ -1,4 +1,3 @@
-import collections
 import copy
 import itertools
 import keyword
@@ -7,6 +6,7 @@ import pickle
 import shutil
 import textwrap
 import threading
+import traceback
 
 import qt
 import slicer
@@ -15,8 +15,9 @@ from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 
 from Widgets.PipelineModuleListWidget import PipelineModuleListWidget
-from _PipelineCreatorLib.ModuleHolder import ModuleHolder
-from _PipelineCreatorLib.ModuleTemplate import ModuleTemplate
+from PipelineCreatorLib._Private.ModuleHolder import ModuleHolder
+from PipelineCreatorLib._Private.ModuleTemplate import ModuleTemplate
+from PipelineCreatorLib.PipelineBases import PipelineInterface, ProgressablePipeline # ProgressablePipeline import needed for test run to work
 
 #
 # PipelineCreator
@@ -194,7 +195,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     except Exception as e:
       msgbox = qt.QMessageBox()
       msgbox.setWindowTitle("Error running pipeline")
-      msgbox.setText(str(e))
+      msgbox.setText(str(e) + '\n\n' + "".join(traceback.TracebackException.from_exception(e).format()))
       msgbox.exec()
 
   def _modulesChanged(self):
@@ -323,10 +324,6 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       self._runPipelineProgressDialog.value = pipelineProgress.progress * 100
       slicer.app.processEvents()
 
-
-PipelineProgress = collections.namedtuple("PiplineProgress",
-  "progress currentPipelinePieceName currentPipelinePieceNumber numberOfPieces")
-
 #
 # PipelineCreatorLogic
 #
@@ -383,6 +380,9 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     """
     Registers a module for use with the PipelineCreator
     """
+    if not issubclass(module, PipelineInterface):
+      raise TypeError("PipelineCreator registerModule argument must be a PipelineInterface")
+
     if module.GetName() in [x.name for x in self.allModules]:
       raise Exception("Already registered module with the name '%s'" % module.GetName())
 
@@ -399,7 +399,6 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     modules is [(moduleName, {module-parameter-name: module-parameter-value})]
      List of tuples. Each tuple is the module name and a dictionary of fixed parameters.
      Not all of the modules parameters need to be fixed.
-    This method is not thread safe?
     """
     replacements = self._makeReplacements("UnfinalizedPipeline", modules)
     moduleTemplateFile = os.path.join(self._getPipelineTemplateModulePath(), 'XXX.py.template')
@@ -721,28 +720,22 @@ def CallAfterAllTheseModulesLoaded(callback, modules):
         slicer.app.moduleManager().moduleLoaded.disconnect(callbackWrapper)
     slicer.app.moduleManager().moduleLoaded.connect(callbackWrapper)
 
-def SingletonRegisterModule(module, moduleDependencies = None):
+def SingletonRegisterModule(module):
   """
   This method will handle correctly registering the module regardless of if
   the pipeline creator has already been loaded into slicer when it is called
   """
   def register():
-    try:
       PipelineCreatorLogic().registerModule(module)
-    except TypeError:
-      PipelineCreatorLogic().registerModule(module())
-  dependencies = moduleDependencies or []
+  dependencies = module.GetDependencies()
   dependencies.append('PipelineCreator')
   CallAfterAllTheseModulesLoaded(register, dependencies)
 
-def slicerPipeline(classVar):
+def slicerPipeline(module):
   """
   Class decorator to automatically register a class with the pipeline creator
   """
-  try:
-    dependencies = classVar.GetDependencies()
-  except AttributeError:
-    dependencies = []
-
-  SingletonRegisterModule(classVar, dependencies)
-  return classVar
+  if not issubclass(module, PipelineInterface):
+    raise TypeError("A slicerPipeline must be a PipelineInterface: " + str(module.__name__))
+  SingletonRegisterModule(module)
+  return module

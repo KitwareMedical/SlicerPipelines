@@ -3,6 +3,7 @@ import enum
 import re
 
 import slicer
+from PipelineCreatorLib.PipelineBases import SinglePiecePipeline # Note: this import may show up as unused in linting, but it is needed for the exec calls to work
 
 class BridgeParameterWrapper:
   '''
@@ -115,7 +116,7 @@ def _fixupModuleName(name):
   return _invalidCharactersRe.sub('', name)
   
 _pipelineClassTemplate = '''
-class PipelineWrapper_{fixupModuleName}:
+class PipelineWrapper_{fixupModuleName}(SinglePiecePipeline):
   @staticmethod
   def GetName():
     return '{moduleName}'
@@ -128,10 +129,19 @@ class PipelineWrapper_{fixupModuleName}:
   def GetOutputType():
     return '{outputType}'
 
+  @staticmethod
+  def GetParameters():
+    return PipelineWrapper_{fixupModuleName}._GetParametersImpl()
+
+  @staticmethod
+  def GetDependencies():
+    return PipelineWrapper_{fixupModuleName}._GetDependenciesImpl()
+
   def __init__(self):
+    super().__init__()
     self._parameters = dict()
 
-  def Run(self, input):
+  def _RunImpl(self, input):
     self.Set{inputParameter}(input)
     output = slicer.mrmlScene.AddNewNodeByClass(self.GetOutputType())
     output.CreateDefaultDisplayNodes()
@@ -185,18 +195,21 @@ def PipelineCLI(cliModule, pipelineCreatorLogic, inputArgName=None, outputArgNam
 
   cliPipeline = globals()['PipelineWrapper_%s' % fixupModuleName]
 
+  # need the abstract method implementation to exist at class definition, so delegating
+  # to a method that doesn't need to exists as class definition.
+  # Note: this is probably not necessary in Python 3.10 via abc.update_abstractmethods
   @staticmethod
-  def GetParameters():
+  def _GetParametersImpl():
     factory = slicer.qSlicerPipelineCLIModulesBridgeParameterFactory()
     factory.loadCLIModule(cliModule.name)
     return cliToPipelineParameters(factory, cliParameters, [inputArg.name, outputArg.name] + list(excludeArgs))
-  setattr(cliPipeline, "GetParameters", GetParameters)
+  setattr(cliPipeline, "_GetParametersImpl", _GetParametersImpl)
 
   dependencies = list(set(list(cliModule.dependencies) + ['PipelineCreator']))
   @staticmethod
-  def GetDependencies():
+  def _GetDependenciesImpl():
     return dependencies
-  setattr(cliPipeline, "GetDependencies", GetDependencies)
+  setattr(cliPipeline, "_GetDependenciesImpl", _GetDependenciesImpl)
 
   @staticmethod
   def GetModule():
