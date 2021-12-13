@@ -6,7 +6,9 @@ import pickle
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
-from PipelineCreator import PipelineProgress, slicerPipeline
+from PipelineCreator import slicerPipeline
+from PipelineCreatorLib.PipelineBases import ProgressablePipeline
+
 
 class {{MODULE_NAME}}(ScriptedLoadableModule):
   def __init__(self, parent):
@@ -190,14 +192,14 @@ class {{MODULE_NAME}}Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         msgbox.exec()
 
 @slicerPipeline
-class {{MODULE_NAME}}Logic(ScriptedLoadableModuleLogic):
+class {{MODULE_NAME}}Logic(ScriptedLoadableModuleLogic, ProgressablePipeline):
   def __init__(self):
     """
     Called when the logic class is instantiated. Can be used for initializing member variables.
     """
     ScriptedLoadableModuleLogic.__init__(self)
+    ProgressablePipeline.__init__(self)
     self.deleteIntermediates = True
-    self._progressCallback = None
 
   @staticmethod
   def GetName():
@@ -215,25 +217,12 @@ class {{MODULE_NAME}}Logic(ScriptedLoadableModuleLogic):
   def GetDependencies():
     return {{MODULE_DEPENDENCIES}}
 
-  #TODO get parameters
   @staticmethod
   def GetParameters():
     return []
 
   def GetNumberOfPieces(self):
     return {{MODULE_COUNT}}
-
-  def SetProgressCallback(self, cb):
-    self._progressCallback = cb
-
-  def _Progress(self, moduleName, currentPipelinePieceNumber):
-    if self._progressCallback:
-      self._progressCallback(PipelineProgress(
-        progress=currentPipelinePieceNumber / self.GetNumberOfPieces(),
-        currentPipelinePieceName=moduleName,
-        currentPipelinePieceNumber=currentPipelinePieceNumber+1,
-        numberOfPieces=self.GetNumberOfPieces(),
-        ))
 
   {{MODULE_RUN_METHOD}}
 

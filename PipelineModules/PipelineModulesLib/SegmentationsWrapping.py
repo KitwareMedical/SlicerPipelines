@@ -2,10 +2,11 @@ import copy
 import vtk
 import slicer
 from PipelineCreator import slicerPipeline
+from PipelineCreatorLib.PipelineBases import SinglePiecePipeline
 from .PipelineParameters import FloatParameterWithSlider, StringParameter
 
 @slicerPipeline
-class ConvertModelToSegmentation(object):
+class ConvertModelToSegmentation(SinglePiecePipeline):
     DefaultVolumeName = "PipelineSegmentationVolume"
     DefaultVolumeSpacing = [0.2, 0.2, 0.2]
     DefaultVolumeMargin = [10.0, 10.0, 10.0]
@@ -34,6 +35,7 @@ class ConvertModelToSegmentation(object):
       return ['Segmentations']
 
     def __init__(self):
+      super().__init__()
       self._volumeName = self.DefaultVolumeName
       self._volumeSpacing = copy.deepcopy(ConvertModelToSegmentation.DefaultVolumeSpacing)
       self._volumeMargin = copy.deepcopy(ConvertModelToSegmentation.DefaultVolumeMargin)
@@ -56,7 +58,7 @@ class ConvertModelToSegmentation(object):
       self._volumeMargin[2] = margin
 
 
-    def Run(self, input):
+    def _RunImpl(self, input):
       segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode')
       segmentationNode.CreateDefaultDisplayNodes()
 

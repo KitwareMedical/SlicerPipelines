@@ -1,11 +1,13 @@
 import slicer
 from PipelineCreator import slicerPipeline
-from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameterWithSlider, IntegerParameterWithSlider
+from PipelineCreatorLib.PipelineBases import SinglePiecePipeline
+from .PipelineParameters import BooleanParameter, FloatParameterWithSlider
 from SurfaceToolbox import SurfaceToolboxLogic
 
 ###############################################################################
-class SurfaceToolboxBase(object):
+class SurfaceToolboxBase(SinglePiecePipeline):
   def __init__(self):
+    super().__init__()
     self._parameterNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScriptedModuleNode")
     self._surfaceToolboxLogic = SurfaceToolboxLogic()
     self._surfaceToolboxLogic.setDefaultParameters(self._parameterNode)
@@ -35,7 +37,7 @@ class SurfaceToolboxBase(object):
   def GetOutputType():
     return "vtkMRMLModelNode"
 
-  def Run(self, input):
+  def _RunImpl(self, input):
     if self.verboseRun:
       print("Running %s" % self.GetName())
       for paramName, _ in self.GetParameters():

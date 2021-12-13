@@ -1,11 +1,13 @@
 import slicer
 from PipelineCreator import slicerPipeline
+from PipelineCreatorLib.PipelineBases import SinglePiecePipeline
 from .PipelineParameters import IntegerParameter, StringComboBoxParameter, FloatParameterWithSlider, FloatRangeParameter
 import SegmentEditorEffects
 
 ###############################################################################
-class SegmentEditorBase(object):
+class SegmentEditorBase(SinglePiecePipeline):
   def __init__(self):
+    super().__init__()
     self._segmentEditorWidget = slicer.qMRMLSegmentEditorWidget()
     self._segmentEditorNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentEditorNode')
     self._segmentEditorWidget.setMRMLSegmentEditorNode(self._segmentEditorNode)
@@ -30,7 +32,7 @@ class SegmentEditorBase(object):
   def setMRMLScene(self, scene):
     self._segmentEditorWidget.setMRMLScene(scene)
 
-  def Run(self, input):
+  def _RunImpl(self, input):
     shNode = slicer.mrmlScene.GetSubjectHierarchyNode()
     itemID = shNode.GetItemByDataNode(input)
     newItemID = slicer.modules.subjecthierarchy.logic().CloneSubjectHierarchyItem(shNode, itemID)

@@ -5,6 +5,7 @@ import textwrap
 import slicer # Note: this import may show up as unused in linting, but it is needed for the exec calls to work
 import vtk # Note: this import may show up as unused in linting, but it is needed for the exec calls to work
 from .PipelineParameters import BooleanParameter, StringComboBoxParameter, FloatParameterWithSlider, IntegerParameterWithSlider
+from PipelineCreatorLib.PipelineBases import SinglePiecePipeline # Note: this import may show up as unused in linting, but it is needed for the exec calls to work
 
 def _fixUpParameterName(parameterName):
   newName = parameterName.replace(" ", "")
@@ -77,7 +78,7 @@ def _makeFilterClass(item):
   parameterSetMethods = [_createParamSetMethod(p) for p in item['parameters']]
 
   classDefinition = textwrap.dedent('''
-    class {filtername}PipelineWrapper:
+    class {filtername}PipelineWrapper(SinglePiecePipeline):
       @staticmethod
       def GetName():
         return '{name}'
@@ -94,10 +95,15 @@ def _makeFilterClass(item):
       def GetOutputType():
         return '{outputType}'
 
+      @staticmethod
+      def GetParameters():
+        return {filtername}PipelineWrapper._GetParametersImpl()
+
       def __init__(self):
+        super().__init__()
         self._filter = vtk.{filtername}()
 
-      def Run(self, input):
+      def _RunImpl(self, input):
         outputModel = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode")
         self._filter.SetInputData(input.GetMesh())
         self._filter.Update()
@@ -115,14 +121,17 @@ def _makeFilterClass(item):
 
   VTKFilter = globals()['%sPipelineWrapper' % filtername]
 
+  # need the abstract method implementation to exist at class definition, so delegating
+  # to a method that doesn't need to exists as class definition.
+  # Note: this is probably not necessary in Python 3.10 via abc.update_abstractmethods
   @staticmethod
-  def GetParameters():
+  def _GetParametersImpl():
     return [(p['name'], _createParamUI(p)) for p in item['parameters']]
-  setattr(VTKFilter, "GetParameters", GetParameters)
+  setattr(VTKFilter, "_GetParametersImpl", _GetParametersImpl)
 
   for methodName, method in parameterSetMethods:
     setattr(VTKFilter, methodName, method)
-  
+
   return VTKFilter
 
 def ReadFromFile(filename):
