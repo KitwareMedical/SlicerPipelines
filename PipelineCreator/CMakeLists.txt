@@ -7,7 +7,6 @@ set(MODULE_PYTHON_SCRIPTS
   Widgets/SelectModulePopUp.py
   Widgets/PipelineModuleListWidget.py
 
-  PipelineCreatorLib/_Private/ModuleHolder.py
   PipelineCreatorLib/_Private/ModuleTemplate.py
   PipelineCreatorLib/PipelineBases.py
   )

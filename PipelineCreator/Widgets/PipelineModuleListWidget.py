@@ -7,14 +7,14 @@ class _PipelineModuleWidget(qt.QWidget):
   def __init__(self, parent=None, module=None):
     qt.QWidget.__init__(self, parent)
 
-    self.parameters = module.MakeParameters()
+    self.parameters = module.GetParameters()
     self.module = module
 
     self._mainLayout = qt.QVBoxLayout(self)
 
     self._cbutton = ctk.ctkCollapsibleButton()
     self._mainLayout.addWidget(self._cbutton)
-    self._cbutton.setText(self.module.name)
+    self._cbutton.setText(self.module.GetName())
     self._cbutton.collapsed = False
 
     # hlayout of up/delete/down buttons and parameters
@@ -34,7 +34,7 @@ class _PipelineModuleWidget(qt.QWidget):
     # add input/output labels and parameters
     moduleFormLayout = qt.QFormLayout()
     hlayout.addLayout(moduleFormLayout)
-    self._inputTypeWidget = qt.QLineEdit(str(self.module.inputType))
+    self._inputTypeWidget = qt.QLineEdit(str(self.module.GetInputType()))
     self._inputTypeWidget.setReadOnly(True)
     moduleFormLayout.addRow("Input Type", self._inputTypeWidget)
 
@@ -48,9 +48,9 @@ class _PipelineModuleWidget(qt.QWidget):
           moduleFormLayout.addRow(label, param.GetUI())
       except Exception as e:
         raise Exception ("Exception trying to create parameter: '%s' for module '%s'\n    %s"
-          % (tup[0], self.module.name, str(e)))
+          % (tup[0], self.module.GetName(), str(e)))
 
-    self._outputTypeWidget = qt.QLineEdit(str(self.module.outputType))
+    self._outputTypeWidget = qt.QLineEdit(str(self.module.GetOutputType()))
     self._outputTypeWidget.setReadOnly(True)
     moduleFormLayout.addRow("Output Type", self._outputTypeWidget)
 
@@ -107,7 +107,7 @@ class PipelineModuleListWidget(qt.QWidget):
     return self._moduleWidgets[index].parameters
 
   def getAllParameters(self):
-    return [(m.module.name, m.parameters) for m in self._moduleWidgets]
+    return [(m.module.GetName(), m.parameters) for m in self._moduleWidgets]
 
   def count(self):
     return len(self._moduleWidgets)
@@ -121,7 +121,7 @@ class PipelineModuleListWidget(qt.QWidget):
       self._moduleWidgets[0].setInputTypePalette(defaultPalette)
       self._moduleWidgets[-1].setOutputTypePalette(defaultPalette)
       for curWidget, nextWidget in zip(self._moduleWidgets[:-1], self._moduleWidgets[1:]):
-        match = curWidget.module.outputType == nextWidget.module.inputType
+        match = curWidget.module.GetOutputType() == nextWidget.module.GetInputType()
         palette = defaultPalette if match else badPalette
         curWidget.setOutputTypePalette(palette)
         nextWidget.setInputTypePalette(palette)
@@ -159,7 +159,7 @@ class PipelineModuleListWidget(qt.QWidget):
   def _onDeleteModule(self, pipelineModuleWidget):
     q = qt.QMessageBox()
     q.setWindowTitle("Deleting module")
-    q.setText("Are you sure you want to delete module '%s'?" % pipelineModuleWidget.module.name)
+    q.setText("Are you sure you want to delete module '%s'?" % pipelineModuleWidget.module.GetName())
     q.addButton(qt.QMessageBox.Yes)
     q.addButton(qt.QMessageBox.No)
 
@@ -192,7 +192,7 @@ class PipelineModuleListWidget(qt.QWidget):
 
     except Exception as e:
       print ("Exception trying add module: '%s'\n    %s"
-        % (module.name, str(e)))
+        % (module.GetName(), str(e)))
       raise
 
   def clear(self):
@@ -203,7 +203,7 @@ class PipelineModuleListWidget(qt.QWidget):
     self.emitModified()
 
   def getInputType(self):
-    return self._moduleWidgets[0].module.inputType if self._moduleWidgets else None
+    return self._moduleWidgets[0].module.GetInputType() if self._moduleWidgets else None
 
   def getOutputType(self):
-    return self._moduleWidgets[-1].module.outputType if self._moduleWidgets else None
+    return self._moduleWidgets[-1].module.GetOutputType() if self._moduleWidgets else None

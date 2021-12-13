@@ -15,7 +15,6 @@ from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 
 from Widgets.PipelineModuleListWidget import PipelineModuleListWidget
-from PipelineCreatorLib._Private.ModuleHolder import ModuleHolder
 from PipelineCreatorLib._Private.ModuleTemplate import ModuleTemplate
 from PipelineCreatorLib.PipelineBases import PipelineInterface, ProgressablePipeline # ProgressablePipeline import needed for test run to work
 
@@ -383,16 +382,16 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     if not issubclass(module, PipelineInterface):
       raise TypeError("PipelineCreator registerModule argument must be a PipelineInterface")
 
-    if module.GetName() in [x.name for x in self.allModules]:
+    if module.GetName() in [x.GetName() for x in self.allModules]:
       raise Exception("Already registered module with the name '%s'" % module.GetName())
 
     lowerName = module.GetName().lower()
     for i in range(len(self._allModules)):
-      if lowerName < self._allModules[i].name.lower():
-        self._allModules.insert(i, ModuleHolder(module))
+      if lowerName < self._allModules[i].GetName().lower():
+        self._allModules.insert(i, module)
         break
     else:
-      self._allModules.append(ModuleHolder(module))
+      self._allModules.append(module)
 
   def runPipeline(self, modules, inputNode):
     """
@@ -453,10 +452,10 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
           errorStr += " - Unknown pipeline module: '%s'\n" % modules[index - 1][0]
         if not module:
           errorStr += " - Unknown pipeline module: '%s'\n" % modules[index][0]
-        if prevModule and module and prevModule.outputType != module.inputType:
+        if prevModule and module and prevModule.GetOutputType() != module.GetInputType():
           errorStr += " - Mismatched output to input type\n"
-          errorStr += "   Between modules %d (%s) and %d (%s)\n" % (index-1, prevModule.name, index, module.name)
-          errorStr += "   %s != %s\n" % (prevModule.outputType, module.inputType)
+          errorStr += "   Between modules %d (%s) and %d (%s)\n" % (index-1, prevModule.GetName(), index, module.GetName())
+          errorStr += "   %s != %s\n" % (prevModule.GetOutputType(), module.GetInputType())
 
     if errorStr:
       raise Exception("Error creating pipeline: \n" + errorStr)
@@ -468,7 +467,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     deps = ['PipelineCreator']
     for moduleName, _ in modules:
       module = self.moduleFromName(moduleName)
-      deps += module.dependencies
+      deps += module.GetDependencies()
     deps = sorted(list(set(deps))) # Remove duplicates
 
     return {
@@ -482,8 +481,8 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       "MODULE_UPDATE_GUI_FROM_PARAMETER_NODE": "", #TODO implement as part of non-fixed parameters
       "MODULE_UPDATE_PARAMETER_NODE_FROM_GUI": "", #TODO implement as part of non-fixed parameters
       "MODULE_LOGIC_SET_METHODS": "", #TODO implement as part of non-fixed parameters
-      "MODULE_INPUT_TYPE": self.moduleFromName(modules[0][0]).inputType,
-      "MODULE_OUTPUT_TYPE": self.moduleFromName(modules[-1][0]).outputType,
+      "MODULE_INPUT_TYPE": self.moduleFromName(modules[0][0]).GetInputType(),
+      "MODULE_OUTPUT_TYPE": self.moduleFromName(modules[-1][0]).GetOutputType(),
     }
 
   #this is anticipated to be needed for non-fixed parameters
@@ -531,11 +530,11 @@ def Run(self, inputNode):
   def _createRunMethod(self, modules):
     methodText = self._beginningOfRunMethod
     for moduleName, parameters in modules:
-      moduleHolder = self.moduleFromName(moduleName)
+      module = self.moduleFromName(moduleName)
       #the register doesn't really care if it gets a class or an instance, so handle both cases
-      methodText += "    # {stringClass}\n".format(stringClass=str(moduleHolder.moduleClass))
+      methodText += "    # {stringClass}\n".format(stringClass=str(module))
       methodText += "    nextPipelinePiece = pickle.loads({pickledClass})()\n".format(
-          pickledClass=pickle.dumps(moduleHolder.moduleClass),
+          pickledClass=pickle.dumps(module),
         )
       methodText += "    self._Progress(nextPipelinePiece.GetName(), currentPipelinePieceNumber)\n"
 
@@ -573,7 +572,7 @@ def Run(self, inputNode):
     return methodText
 
   def moduleFromName(self, moduleName):
-    mods = [x for x in self.allModules if x.name == moduleName]
+    mods = [x for x in self.allModules if x.GetName() == moduleName]
     if mods:
       return mods[0]
     return None
