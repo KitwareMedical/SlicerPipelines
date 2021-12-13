@@ -22,7 +22,7 @@ class SelectModulePopUp(qt.QDialog):
 
     #input type
     self.cboxInputType = qt.QComboBox()
-    self.cboxInputType.addItems(sorted(list(set([x.inputType for x in self._availableModules]))))
+    self.cboxInputType.addItems(sorted(list(set([x.GetInputType() for x in self._availableModules]))))
     self.cboxInputType.currentTextChanged.connect(self._updateListWidget)
     self.formLayout.addRow("Input Type:", self.cboxInputType)
 
@@ -66,15 +66,15 @@ class SelectModulePopUp(qt.QDialog):
     self.leOutputType.setText("")
     self.okButton.setEnabled(False)
 
-    for module in [m for m in self._availableModules if m.inputType == self.cboxInputType.currentText]:
-      self.listWidget.addItem(module.name)
+    for module in [m for m in self._availableModules if m.GetInputType() == self.cboxInputType.currentText]:
+      self.listWidget.addItem(module.GetName())
 
   def _updateOutputType(self):
     listItem = self.listWidget.currentItem()
     if listItem:
-      modules = [m for m in self._availableModules if m.inputType == self.cboxInputType.currentText]
-      module = [x for x in modules if x.name == listItem.text()][0]
-      self.leOutputType.setText(module.outputType)
+      modules = [m for m in self._availableModules if m.GetInputType() == self.cboxInputType.currentText]
+      module = [x for x in modules if x.GetName() == listItem.text()][0]
+      self.leOutputType.setText(module.GetOutputType())
       self._chosenModule = module
       self.okButton.setEnabled(True)
     else:
