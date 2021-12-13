@@ -18,6 +18,26 @@ from Widgets.PipelineModuleListWidget import PipelineModuleListWidget
 from PipelineCreatorLib._Private.ModuleTemplate import ModuleTemplate
 from PipelineCreatorLib.PipelineBases import PipelineInterface, ProgressablePipeline # ProgressablePipeline import needed for test run to work
 
+def CloneInto(src, dest):
+  '''
+  Clones src into dest, but keeps dest's display and storage nodes, if any
+  If neither src nor dest has display nodes, the default are created
+  '''
+  if src is not None and dest is not None:
+    name = dest.GetName()
+    displayNodesIDs = [dest.GetNthDisplayNodeID(n) for n in range(dest.GetNumberOfDisplayNodes())]
+    storageNodesIDs = [dest.GetNthStorageNodeID(n) for n in range(dest.GetNumberOfStorageNodes())]
+
+    dest.Copy(src)
+    dest.SetName(name)
+
+    dest.RemoveAllDisplayNodeIDs()
+
+    for n, displayNodeID in enumerate(displayNodesIDs):
+      dest.SetAndObserveNthDisplayNodeID(n, displayNodeID)
+    for n, storageNodeID in enumerate(storageNodesIDs):
+      dest.SetAndObserveNthStorageNodeID(n, storageNodeID)
+
 #
 # PipelineCreator
 #
@@ -166,32 +186,25 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       modules = self._convertModuleListWidgetToLogicInput()
       inputNode = self.ui.cboxTestInput.currentNode()
       desiredOutputNode = self.ui.cboxTestOutput.currentNode()
-      if desiredOutputNode is None and self._moduleListWidget.getOutputType() is not None:
-        raise Exception("No output node for pipeline that has output")
+      if desiredOutputNode is None:
+        raise Exception("An output node must be chosen")
+      desiredOutputNode.CreateDefaultDisplayNodes()
 
       self._runPipelineProgressDialog = slicer.util.createProgressDialog()
       actualOutputNode = self.logic.runPipeline(modules, inputNode)
-      if actualOutputNode is not None:
-        if desiredOutputNode is not None:
-          #doing vtkMRMLNode::Copy breaks the references to the display and storage nodes. Grab them now so we can delete them.
-          displayNodes = [desiredOutputNode.GetNthDisplayNode(n) for n in range(desiredOutputNode.GetNumberOfDisplayNodes())]
-          storageNodes = [desiredOutputNode.GetNthStorageNode(n) for n in range(desiredOutputNode.GetNumberOfStorageNodes())]
+      CloneInto(actualOutputNode, desiredOutputNode)
 
-          # copy into node, but keep name
-          name = desiredOutputNode.GetName()
-          desiredOutputNode.Copy(actualOutputNode)
-          desiredOutputNode.SetName(name)
+      if inputNode.GetDisplayNode() is not None:
+        inputNode.GetDisplayNode().SetVisibility(False)
+      if desiredOutputNode.GetDisplayNode() is not None:
+        desiredOutputNode.GetDisplayNode().SetVisibility(True)
+      slicer.mrmlScene.RemoveNode(actualOutputNode)
 
-          for n in itertools.chain(displayNodes, storageNodes):
-            slicer.mrmlScene.RemoveNode(n)
-        slicer.mrmlScene.RemoveNode(actualOutputNode)
-        if not desiredOutputNode.GetDisplayNode():
-          desiredOutputNode.CreateDefaultDisplayNodes()
-          desiredOutputNode.GetDisplayNode().SetVisibility(True)
-
-        if self._moduleListWidget.getInputType() is not None:
-          inputNode.GetDisplayNode().SetVisibility(False)
     except Exception as e:
+      if self._runPipelineProgressDialog is not None:
+        self._runPipelineProgressDialog.close()
+        self._runPipelineProgressDialog = None
+
       msgbox = qt.QMessageBox()
       msgbox.setWindowTitle("Error running pipeline")
       msgbox.setText(str(e) + '\n\n' + "".join(traceback.TracebackException.from_exception(e).format()))
