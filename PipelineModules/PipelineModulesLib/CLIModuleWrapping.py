@@ -1,8 +1,6 @@
 import collections
 import enum
-from os import EX_CANTCREAT
 import re
-import threading
 
 import slicer
 
