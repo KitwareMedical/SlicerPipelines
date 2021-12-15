@@ -22,6 +22,7 @@ include(${Slicer_USE_FILE})
 add_subdirectory(PipelineCreator)
 add_subdirectory(PipelineModules)
 add_subdirectory(PipelineCLIBridge)
+add_subdirectory(PipelineCaseIterator)
 ## NEXT_MODULE
 
 #-----------------------------------------------------------------------------
