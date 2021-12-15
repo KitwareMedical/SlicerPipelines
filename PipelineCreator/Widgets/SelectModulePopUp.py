@@ -1,7 +1,7 @@
 import qt
 
 class SelectModulePopUp(qt.QDialog):
-  def __init__(self, availableModules, defaultInput, parent = None):
+  def __init__(self, availableModules, defaultInput=None, parent = None):
     qt.QDialog.__init__(self, parent)
 
     self._chosenModule = None
