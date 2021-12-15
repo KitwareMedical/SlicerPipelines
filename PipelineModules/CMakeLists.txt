@@ -1,8 +1,6 @@
 #-----------------------------------------------------------------------------
 set(MODULE_NAME PipelineModules)
 
-add_subdirectory(BridgeParameters)
-
 #-----------------------------------------------------------------------------
 set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py

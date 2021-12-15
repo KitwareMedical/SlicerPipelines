@@ -23,7 +23,7 @@
 
 #include "qSlicerPipelineCLIModulesBridgeParameter.h"
 
-class Q_SLICER_MODULE__WIDGETS_EXPORT @BRIDGE_TEMPLATE_NAME@
+class Q_SLICER_MODULE_PIPELINECLIBRIDGE_WIDGETS_EXPORT @BRIDGE_TEMPLATE_NAME@
   : public qSlicerPipelineCLIModulesBridgeParameter
 {
   Q_OBJECT

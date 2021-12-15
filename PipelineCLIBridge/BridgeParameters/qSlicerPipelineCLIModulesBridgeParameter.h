@@ -28,7 +28,7 @@
 #include <QWidget>
 
 // Bridge Widgets includes
-#include "qSlicerPipelineModulesModuleWidgetsExport.h"
+#include "qSlicerPipelineCLIBridgeModuleWidgetsExport.h"
 #include "qSlicerCLIModuleWidget.h"
 #include "qSlicerCLIModuleUIHelper.h"
 
@@ -124,7 +124,7 @@ struct Converter<QVector<T>> {
 };
 
 //----------------------------------------------------------------------------
-class Q_SLICER_MODULE__WIDGETS_EXPORT qSlicerPipelineCLIModulesBridgeParameter
+class Q_SLICER_MODULE_PIPELINECLIBRIDGE_WIDGETS_EXPORT qSlicerPipelineCLIModulesBridgeParameter
   : public QObject
 {
   Q_OBJECT
