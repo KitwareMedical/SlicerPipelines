@@ -21,6 +21,7 @@ include(${Slicer_USE_FILE})
 # Extension modules
 add_subdirectory(PipelineCreator)
 add_subdirectory(PipelineModules)
+add_subdirectory(PipelineCLIBridge)
 ## NEXT_MODULE
 
 #-----------------------------------------------------------------------------

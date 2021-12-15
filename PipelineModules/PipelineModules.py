@@ -26,9 +26,10 @@ class PipelineModules(ScriptedLoadableModule):
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
     self.parent.title = "Pipeline Modules"
-    self.parent.categories = ["Pipelines"]
+    self.parent.categories = ["Pipelines.Advanced"]
     self.parent.dependencies = [
       "MeshToLabelMap",
+      "PipelineCLIBridge",
       "PipelineCreator",
       "SegmentEditor",
     ]
@@ -38,50 +39,6 @@ class PipelineModules(ScriptedLoadableModule):
 This module exists to create pipelines for the PipelineCreator to use.
 """
     self.parent.acknowledgementText = ""
-
-#
-# PipelineModulesWidget
-#
-
-class PipelineModulesWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
-  """Uses ScriptedLoadableModuleWidget base class, available at:
-  https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
-  """
-
-  def __init__(self, parent=None):
-    """
-    Called when the user opens the module the first time and the widget is initialized.
-    """
-    ScriptedLoadableModuleWidget.__init__(self, parent)
-    VTKObservationMixin.__init__(self)  # needed for parameter node observation
-    self.logic = None
-
-  def setup(self):
-    """
-    Called when the user opens the module the first time and the widget is initialized.
-    """
-    ScriptedLoadableModuleWidget.setup(self)
-
-    # Load widget from .ui file (created by Qt Designer).
-    # Additional widgets can be instantiated manually and added to self.layout.
-    uiWidget = slicer.util.loadUI(self.resourcePath('UI/PipelineModules.ui'))
-    self.layout.addWidget(uiWidget)
-    self.ui = slicer.util.childWidgetVariables(uiWidget)
-
-    # Set scene in MRML widgets. Make sure that in Qt designer the top-level qMRMLWidget's
-    # "mrmlSceneChanged(vtkMRMLScene*)" signal in is connected to each MRML widget's.
-    # "setMRMLScene(vtkMRMLScene*)" slot.
-    uiWidget.setMRMLScene(slicer.mrmlScene)
-
-    # Create logic class. Logic implements all computations that should be possible to run
-    # in batch mode, without a graphical user interface.
-    self.logic = PipelineModulesLogic()
-
-    # Connections
-
-    # These connections ensure that we update parameter node when scene is closed
-    self.addObserver(slicer.mrmlScene, slicer.mrmlScene.StartCloseEvent, self.onSceneStartClose)
-    self.addObserver(slicer.mrmlScene, slicer.mrmlScene.EndCloseEvent, self.onSceneEndClose)
 
 #
 # PipelineModulesLogic

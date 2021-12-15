@@ -27,11 +27,11 @@
 
 // Bridge Widgets includes
 #include "qSlicerPipelineCLIModulesBridgeParameter.h"
-#include "qSlicerPipelineModulesModuleWidgetsExport.h"
+#include "qSlicerPipelineCLIBridgeModuleWidgetsExport.h"
 #include "vtkMRMLCommandLineModuleNode.h"
 
 class qSlicerPipelineCLIModulesBridgeParameterFactoryPrivate;
-class Q_SLICER_MODULE__WIDGETS_EXPORT qSlicerPipelineCLIModulesBridgeParameterFactory
+class Q_SLICER_MODULE_PIPELINECLIBRIDGE_WIDGETS_EXPORT qSlicerPipelineCLIModulesBridgeParameterFactory
   : public QWidget
 {
   Q_OBJECT
