@@ -1,5 +1,8 @@
 import collections
+import datetime
 import os
+import re
+import subprocess
 import traceback
 
 from Widgets.SelectModulePopUp import SelectModulePopUp
@@ -7,7 +10,7 @@ import vtk, qt, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 from PipelineCreator import PipelineCreatorLogic
-from PipelineCreatorLib.PipelineBases import PipelineInterface
+from PipelineCreatorLib.Asynchrony import Asynchrony
 from PipelineModulesLib.Util import ScopedNode, ScopedDefaultStorageNode
 
 # overall - int 0-100 with current overall progress
@@ -16,6 +19,103 @@ from PipelineModulesLib.Util import ScopedNode, ScopedDefaultStorageNode
 # currentNumber - index of current file being run over. Zero based
 PipelineCaseProgress = collections.namedtuple('PipelineCaseProgress',
   "overallPercent currentPipelinePercent totalCount currentNumber")
+
+class PipelineCaseIteratorRunner(object):
+  class _ProgressHelper(object):
+    def __init__(self, numberOfFiles=0, currentFileIndex=0):
+      self.numberOfFiles = numberOfFiles
+      self.currentFileIndex = currentFileIndex
+
+  def __init__(self, pipelineName, inputDirectory, outputDirectory, outputExtension = None, prefix=None, suffix=None, timestampFormat=None, pipelineCreatorLogic=None):
+    if inputDirectory == outputDirectory:
+      raise RuntimeError("Input directory must be different than output directory")
+
+    if not os.path.isdir(inputDirectory):
+      raise RuntimeError("Input directory does not exist or is not a directory: " + inputDirectory)
+
+    if not os.path.exists(outputDirectory):
+      os.makedirs(outputDirectory)
+
+    self._pipelineCreatorLogic = pipelineCreatorLogic or PipelineCreatorLogic()
+    self._pipeline = self._pipelineCreatorLogic.moduleFromName(pipelineName)()
+    self._inputDirectory = inputDirectory
+    self._outputDirectory = outputDirectory
+    self._progressCallback = None
+    self._prefix = prefix
+    self._suffix = suffix
+    self._timestampFormat = timestampFormat
+    self._timestamp = None
+
+    if outputExtension is None:
+      with ScopedNode(slicer.mrmlScene.AddNewNodeByClass(self._pipeline.GetOutputType())) as outputNode:
+        with ScopedDefaultStorageNode(outputNode) as store:
+          writeFileTypes = store.GetSupportedWriteFileTypes()
+          writeFileExts = vtk.vtkStringArray()
+          store.GetFileExtensionsFromFileTypes(writeFileTypes, writeFileExts)
+        if writeFileExts.GetNumberOfValues() > 0:
+          outputExtension = writeFileExts.GetValue(0)
+        else:
+          raise Exception('Output extension not specified and unable to deduce a valid extension')
+    elif not outputExtension.startswith('.'):
+      outputExtension = '.' + outputExtension
+
+    self._outputExtension = outputExtension
+    self._progressHelper = self._ProgressHelper(0,0)
+
+  def setProgressCallback(self, progressCallback):
+    self._progressCallback = progressCallback
+
+  def run(self):
+    if self._timestampFormat is not None:
+      self._timestamp = datetime.datetime.now().strftime(self._timestampFormat)
+    self._pipeline.SetProgressCallback(self._setPipelineProgress)
+    try:
+      filenames = os.listdir(self._inputDirectory)
+      self._progressHelper.numberOfFiles = len(filenames)
+      for index, filename in enumerate(filenames):
+        self._progressHelper.currentFileIndex = index
+        inputFilepath = os.path.join(self._inputDirectory, filename)
+        outputFilepath = self._createOutputFilepath(filename)
+        self._runOnFile(self._pipeline, inputFilepath, outputFilepath)
+    finally:
+      self._pipeline.SetProgressCallback(None)
+
+  def _createOutputFilepath(self, inputFilename):
+    outputFilename = os.path.splitext(inputFilename)[0]
+    if self._prefix is not None:
+      outputFilename = self._prefix + outputFilename
+    if self._suffix is not None:
+      outputFilename = outputFilename + self._suffix
+    if self._timestamp is not None:
+      outputFilename = outputFilename + self._timestamp
+    outputFilename += self._outputExtension
+    return os.path.join(self._outputDirectory, outputFilename)
+
+  def _loadInputNode(self, pipeline, inputFilename):
+    inputNode = slicer.mrmlScene.AddNewNodeByClass(pipeline.GetInputType())
+    with ScopedDefaultStorageNode(inputNode) as store:
+      store.SetFileName(inputFilename)
+      store.ReadData(inputNode)
+    return inputNode
+
+  def _setPipelineProgress(self, pipelineProgress):
+    currentPipelineProgress = pipelineProgress.progress * 100
+    overallProgressBase = self._progressHelper.currentFileIndex / self._progressHelper.numberOfFiles * 100
+    if self._progressCallback is not None:
+      self._progressCallback(PipelineCaseProgress(
+        overallPercent=int(overallProgressBase + currentPipelineProgress / self._progressHelper.numberOfFiles),
+        currentPipelinePercent=int(currentPipelineProgress),
+        totalCount=self._progressHelper.numberOfFiles,
+        currentNumber=self._progressHelper.currentFileIndex,
+      ))
+
+  def _runOnFile(self, pipeline, inputFilename, outputFilename):
+    with ScopedNode(self._loadInputNode(pipeline, inputFilename)) as inputNode:
+      with ScopedNode(pipeline.Run(inputNode)) as outputNode:
+        success = slicer.util.saveNode(outputNode, outputFilename)
+        if not success:
+          raise Exception('Failed to save node to file: ' + outputFilename + '\nTry checking the error log for more details')
+
 
 #
 # PipelineCaseIterator
@@ -77,6 +177,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
     # in batch mode, without a graphical user interface.
     self.logic = PipelineCaseIteratorLogic()
     self.logic.setProgressCallback(self._progressCallback)
+    self.logic.setFinishedCallback(self._runFinished)
 
     # Connections
 
@@ -84,6 +185,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
     self.ui.outputDirectoryBrowseButton.clicked.connect(self.browseOutputDirectory)
     self.ui.pipelineSelectionButton.clicked.connect(self.selectPipeline)
     self.ui.runButton.clicked.connect(self.run)
+    self.ui.cancelButton.clicked.connect(self.cancel)
 
   def _progressCallback(self, progress):
     self.ui.overallProgressBar.value = progress.overallPercent
@@ -118,8 +220,27 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
     popUp.close()
     popUp.destroy()
 
+  def cancel(self):
+    self.logic.cancel()
+
+  def _runFinished(self, exception):
+    self.ui.runButton.enabled = True
+    self.ui.cancelButton.enabled = False
+
+    if exception is not None:
+      msgbox = qt.QMessageBox()
+      msgbox.setWindowTitle('Error running pipeline case iterator')
+      if not isinstance(exception, CaseIteratorSubProcessError):
+        # don't show the traceback if the subprocess returned a non-zero error because
+        # it is not useful
+        msgbox.setText(str(exception) + '\n\n' + "".join(traceback.TracebackException.from_exception(exception).format()))
+      else:
+        msgbox.setText(str(exception))
+      msgbox.exec()
+
   def run(self):
     self.ui.overallProgressBar.value = 0
+    self.ui.overallProgressBar.setFormat('%p% (0/0)')
     self.ui.pipelineProgressBar.value = 0
     inputDirectory = self.ui.inputDirectoryLineEdit.text
     outputDirectory = self.ui.outputDirectoryLineEdit.text
@@ -127,18 +248,23 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
     outputExtension = self.ui.outputExtensionLineEdit.text if self.ui.outputExtensionLineEdit.text != '' else None
     prefix = self.ui.outputPrefixLineEdit.text # empty string is acceptable
     suffix = self.ui.outputSuffixLineEdit.text # empty string is acceptable
+    timestampFormat = self.ui.timestampFormatLineEdit.text if self.ui.addTimestampCheckbox.checked else None
+
+    errors = []
+    if inputDirectory == "":
+      errors += ["The input directory must be specified"]
+    if outputDirectory == "":
+      errors += ["The output directory must be specified"]
+    if pipelineName == "":
+      errors += ["A pipeline must be chosen"]
+    if errors:
+      msgbox = qt.QMessageBox()
+      msgbox.setWindowTitle('Error starting pipeline case iterator')
+      msgbox.setText('\n'.join(errors))
+      msgbox.exec()
+      return
 
     try:
-      errors = []
-      if inputDirectory == "":
-        errors += ["The input directory must be specified"]
-      if outputDirectory == "":
-        errors += ["The output directory must be specified"]
-      if pipelineName == "":
-        errors += ["A pipeline must be chosen"]
-      if errors:
-        raise Exception('\n'.join(errors))
-
       pipelineInterface = self.pipelineCreatorLogic.moduleFromName(pipelineName)
       self.logic.run(
         pipelineInterface=pipelineInterface,
@@ -146,11 +272,13 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
         outputDirectory=outputDirectory,
         outputExtension=outputExtension,
         prefix=prefix,
-        suffix=suffix)
-
+        suffix=suffix,
+        timestampFormat=timestampFormat)
+      self.ui.runButton.enabled = False
+      self.ui.cancelButton.enabled = True
     except Exception as e:
       msgbox = qt.QMessageBox()
-      msgbox.setWindowTitle('Error running pipeline case iterator')
+      msgbox.setWindowTitle('Error starting pipeline case iterator')
       msgbox.setText(str(e) + '\n\n' + "".join(traceback.TracebackException.from_exception(e).format()))
       msgbox.exec()
 
@@ -160,6 +288,9 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
     Called when the application closes and the module widget is destroyed.
     """
     self.removeObservers()
+
+class CaseIteratorSubProcessError(Exception):
+  pass
 
 #
 # PipelineCaseIteratorLogic
@@ -181,95 +312,129 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
       self.numberOfFiles = numberOfFiles
       self.currentFileIndex = currentFileIndex
 
+  def resourcePath(self, filename):
+    scriptedModulesPath = os.path.dirname(slicer.util.modulePath(self.moduleName))
+    return os.path.join(scriptedModulesPath, 'Resources', filename)
+
   def __init__(self):
     """
     Called when the logic class is instantiated. Can be used for initializing member variables.
     """
     ScriptedLoadableModuleLogic.__init__(self)
+
     self._progressCallback = None
-    self._progressHelper = PipelineCaseIteratorLogic._ProgressHelper(0,0)
+    self._asynchrony = None
+    self._running = False
+    self._finishCallback = None
 
   def setProgressCallback(self, progressCallback=None):
     self._progressCallback = progressCallback
 
-  def run(self, pipelineInterface, inputDirectory, outputDirectory, outputExtension = None, prefix=None, suffix=None):
-    if not issubclass(pipelineInterface, PipelineInterface):
-      raise TypeError("pipeline interface must be a PipelineBases.PipelineInterface")
+  def cancel(self):
+    if self._asynchrony is not None:
+      self._asynchrony.Cancel()
 
-    if not os.path.isdir(inputDirectory):
-      raise RuntimeError("Input directory does not exist or is not a directory: " + inputDirectory)
+  def setFinishedCallback(self, finishCallback=None):
+    self._finishCallback = finishCallback
 
-    if not os.path.exists(outputDirectory):
-      os.makedirs(outputDirectory)
+  def run(self, pipelineInterface, inputDirectory, outputDirectory, outputExtension=None, prefix=None, suffix=None, timestampFormat=None):
+    # we cheat and know how the PipelineCaseIteratorRunner.py does its job, so we are going
+    # to start it to short cut any exceptions and get better error messages
+    # but we don't actually run anything in this process
+    PipelineCaseIteratorRunner(pipelineInterface.GetName(), inputDirectory, outputDirectory, outputExtension, prefix, suffix, timestampFormat)
 
-    pipeline = pipelineInterface()
-    pipeline.SetProgressCallback(self._setPipelineProgress)
+    script = self.resourcePath('CommandLineScripts/PipelineCaseIteratorRunner.py')
+    self._asynchrony = Asynchrony(
+      lambda: self._runImpl(
+        slicer.app.applicationFilePath(), script,
+        pipelineInterface.GetName(), inputDirectory, outputDirectory,
+        outputExtension, prefix, suffix, timestampFormat),
+      self._runFinished)
+    self._asynchrony.Start()
+    self._running = True
 
-    if outputExtension is None:
-      with ScopedNode(slicer.mrmlScene.AddNewNodeByClass(pipeline.GetOutputType())) as outputNode:
-        with ScopedDefaultStorageNode(outputNode) as store:
-          store = outputNode.CreateDefaultStorageNode()
-          writeFileTypes = store.GetSupportedWriteFileTypes()
-          writeFileExts = vtk.vtkStringArray()
-          store.GetFileExtensionsFromFileTypes(writeFileTypes, writeFileExts)
-        if writeFileExts.GetNumberOfValues() > 0:
-          outputExtension = writeFileExts.GetValue(0)
-        else:
-          raise Exception('Output extension not specified and unable to deduce a valid extension')
-    elif not outputExtension.startswith('.'):
-      outputExtension = '.' + outputExtension
+  @property
+  def running(self):
+    return self._running
 
-    filenames = os.listdir(inputDirectory)
-    self._progressHelper.numberOfFiles = len(filenames)
-    for index, filename in enumerate(filenames):
-      self._progressHelper.currentFileIndex = index
-      inputFilepath = os.path.join(inputDirectory, filename)
-      outputFilepath = self._createOutputFilepath(filename, outputDirectory, outputExtension, prefix, suffix)
-      self._runOnFile(pipeline, inputFilepath, outputFilepath)
+  def _runFinished(self):
+    self._running = False
+    try:
+      self._asynchrony.GetOutput()
+      if self._finishCallback is not None:
+        self._finishCallback(None)
+    except Asynchrony.CancelledException:
+      # if they cancelled, the finish was as expected
+      if self._finishCallback is not None:
+        self._finishCallback(None)
+    except Exception as e:
+      if self._finishCallback is not None:
+        self._finishCallback(e)
+    finally:
+      self._asynchrony = None
 
+  def _runImpl(self, launcherPath, scriptPath, pipelineName, inputDirectory, outputDirectory, outputExtension, prefix, suffix, timestampFormat):
+    positiveIntReStr = '[0-9]+'
+    pipelineProgressRe = re.compile(
+      '<pipelineProgress>\s*(?P<overall>{integer}),\s*(?P<piece>{integer}),\s*(?P<totalCount>{integer}),\s*(?P<currentNumber>{integer})\s*</pipelineProgress>'.format(
+        integer=positiveIntReStr))
+
+    cmd = [
+      launcherPath,
+      '--no-main-window',
+      '--python-script',
+      scriptPath,
+      '--',
+      '--pipelineName="%s"' % pipelineName,
+      '--inputDirectory="%s"' % inputDirectory,
+      '--outputDirectory="%s"' % outputDirectory,
+    ]
+    if outputExtension: #empty string would do nothing so don't send it
+      cmd += ['--outputExtension="%s"' % outputExtension]
+    if prefix: #empty string would do nothing so don't send it
+      cmd += ['--prefix="%s"' % prefix]
+    if suffix: #empty string would do nothing so don't send it
+      cmd += ['--suffix="%s"' % suffix]
+    if timestampFormat:  #empty string would do nothing so don't send it
+      cmd += ['--timestampFormat="%s"' % timestampFormat]
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+    totalCount = 0
+
+    try:
+      while True:
+        Asynchrony.CheckCancelled()
+        output = proc.stdout.readline()
+        if not output and proc.poll() is not None:
+          break
+        if output:
+          textOutput = output.decode('ascii')
+          search = re.search(pipelineProgressRe, textOutput)
+          if search:
+            overallProgress = int(search.group('overall'))
+            pieceProgress = int(search.group('piece'))
+            totalCount = int(search.group('totalCount'))
+            currentNumber = int(search.group('currentNumber'))
+            Asynchrony.RunOnMainThread(lambda: self._setProgress(overallProgress, pieceProgress, totalCount, currentNumber))
+          print(textOutput.strip()) # prints the output as if it were run in this process. Useful for debugging.
+      if proc.poll() == 0:
+        Asynchrony.RunOnMainThread(lambda: self._setProgress(100, 100, totalCount, totalCount-1))
+      else:
+        raise CaseIteratorSubProcessError('Error running pipeline case iterator runner')
+    except:
+      proc.terminate()
+      raise
+    finally:
+      proc.stdout.close()
+
+  def _setProgress(self, overall, piece, totalCount, currentNumber):
     if self._progressCallback is not None:
       self._progressCallback(PipelineCaseProgress(
-        overallPercent=100,
-        currentPipelinePercent=100,
-        totalCount=self._progressHelper.numberOfFiles,
-        currentNumber=self._progressHelper.currentFileIndex,
+        overallPercent=overall,
+        currentPipelinePercent=piece,
+        totalCount=totalCount,
+        currentNumber=currentNumber,
       ))
-
-  def _setPipelineProgress(self, pipelineProgress):
-    currentPipelineProgress = pipelineProgress.progress * 100
-    overallProgressBase = self._progressHelper.currentFileIndex / self._progressHelper.numberOfFiles * 100
-    if self._progressCallback is not None:
-      self._progressCallback(PipelineCaseProgress(
-        overallPercent=int(overallProgressBase + currentPipelineProgress / self._progressHelper.numberOfFiles),
-        currentPipelinePercent=int(currentPipelineProgress),
-        totalCount=self._progressHelper.numberOfFiles,
-        currentNumber=self._progressHelper.currentFileIndex,
-      ))
-
-  # inputFilename should be just the file name, no path
-  def _createOutputFilepath(self, inputFilename, outputDirectory, outputExtension, prefix=None, suffix=None):
-    outputFilename = os.path.splitext(inputFilename)[0]
-    if prefix is not None:
-      outputFilename = prefix + outputFilename
-    if suffix is not None:
-      outputFilename = outputFilename + suffix
-    outputFilename += outputExtension
-    return os.path.join(outputDirectory, outputFilename)
-
-  def _loadInputNode(self, pipeline, inputFilename):
-    inputNode = slicer.mrmlScene.AddNewNodeByClass(pipeline.GetInputType())
-    with ScopedDefaultStorageNode(inputNode) as store:
-      store.SetFileName(inputFilename)
-      store.ReadData(inputNode)
-    return inputNode
-
-  def _runOnFile(self, pipeline, inputFilename, outputFilename):
-    with ScopedNode(self._loadInputNode(pipeline, inputFilename)) as inputNode:
-      with ScopedNode(pipeline.Run(inputNode)) as outputNode:
-        success = slicer.util.saveNode(outputNode, outputFilename)
-        if not success:
-          raise Exception('Failed to save node to file: ' + outputFilename + '\nTry checking the error log for more details')
-
 
 #
 # PipelineCaseIteratorTest
