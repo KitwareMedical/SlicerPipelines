@@ -9,6 +9,7 @@ set(MODULE_PYTHON_SCRIPTS
 
   PipelineCreatorLib/_Private/ModuleTemplate.py
   PipelineCreatorLib/PipelineBases.py
+  PipelineCreatorLib/Asynchrony.py
   )
 
 set(MODULE_PYTHON_RESOURCES
