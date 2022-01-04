@@ -183,6 +183,52 @@ class StringComboBoxParameter(object):
 class FloatRangeParameter(object):
   def __init__(self, minimumValue=None, maximumValue=None, minimum=None, maximum=None,
                singleStep=None, decimals=None, suffix=None):
+    self._hlayout = qt.QHBoxLayout()
+    self._minimumSpinbox = qt.QDoubleSpinBox()
+    self._maximumSpinbox = qt.QDoubleSpinBox()
+    #important to set minimum/maximum before minimumValue/maximumValue
+    if minimum:
+      self._minimumSpinbox.minimum = minimum
+      self._maximumSpinbox.minimum = minimum
+    if maximum:
+      self._minimumSpinbox.maximum = maximum
+      self._maximumSpinbox.maximum = maximum
+    if minimumValue:
+      self._minimumSpinbox.value = minimumValue
+    if maximumValue:
+      self._maximumSpinbox.value = maximumValue
+    if singleStep:
+      self._minimumSpinbox.singleStep = singleStep
+      self._maximumSpinbox.singleStep = singleStep
+    if decimals:
+      self._minimumSpinbox.decimals = decimals
+      self._maximumSpinbox.decimals = decimals
+    if suffix:
+      self._minimumSpinbox.suffix = suffix
+      self._maximumSpinbox.suffix = suffix
+
+    self._minimumSpinbox.valueChanged.connect(self._onMinChanged)
+    self._maximumSpinbox.valueChanged.connect(self._onMaxChanged)
+
+    self._hlayout.addWidget(self._minimumSpinbox)
+    self._hlayout.addWidget(self._maximumSpinbox)
+
+  def _onMinChanged(self):
+    if self._maximumSpinbox.value < self._minimumSpinbox.value:
+      self._maximumSpinbox.value = self._minimumSpinbox.value
+
+  def _onMaxChanged(self):
+    if self._minimumSpinbox.value > self._maximumSpinbox.value:
+      self._minimumSpinbox.value = self._maximumSpinbox.value
+
+  def GetUI(self):
+    return self._hlayout
+  def GetValue(self):
+    return (self._minimumSpinbox.minimumValue, self._maximumSpinbox.maximumValue)
+
+class FloatRangeParameterWithSlider(object):
+  def __init__(self, minimumValue=None, maximumValue=None, minimum=None, maximum=None,
+               singleStep=None, decimals=None, suffix=None):
     self._rangeWidget = ctk.ctkRangeWidget()
     #important to set minimum/maximum before minimumValue/maximumValue
     if minimum:

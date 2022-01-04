@@ -1,7 +1,9 @@
+import sys
+
 import slicer
 from PipelineCreator import slicerPipeline
 from PipelineCreatorLib.PipelineBases import SinglePiecePipeline
-from .PipelineParameters import IntegerParameter, StringComboBoxParameter, FloatParameterWithSlider, FloatRangeParameter
+from .PipelineParameters import FloatRangeParameter, IntegerParameter, StringComboBoxParameter, FloatParameterWithSlider
 import SegmentEditorEffects
 
 ###############################################################################
@@ -215,9 +217,9 @@ class ThresholdingEffect(SegmentEditorBase):
       ('Threshold Range', FloatRangeParameter(
         minimumValue=ThresholdingEffect.DefaultThresholdRange[0],
         maximumValue=ThresholdingEffect.DefaultThresholdRange[1],
-        minimum=-1000.,
-        maximum=1000.,
-        singleStep=1.85,
+        minimum=-sys.float_info.max,
+        maximum=sys.float_info.max,
+        singleStep=1,
         decimals=2)),
     ]
   def __init__(self):
