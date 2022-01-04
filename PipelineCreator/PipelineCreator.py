@@ -25,18 +25,19 @@ def CloneInto(src, dest):
   '''
   if src is not None and dest is not None:
     name = dest.GetName()
-    displayNodesIDs = [dest.GetNthDisplayNodeID(n) for n in range(dest.GetNumberOfDisplayNodes())]
-    storageNodesIDs = [dest.GetNthStorageNodeID(n) for n in range(dest.GetNumberOfStorageNodes())]
+    if dest.IsA('vtkMRMLDisplayableNode'):
+      displayNodesIDs = [dest.GetNthDisplayNodeID(n) for n in range(dest.GetNumberOfDisplayNodes())]
+      storageNodesIDs = [dest.GetNthStorageNodeID(n) for n in range(dest.GetNumberOfStorageNodes())]
 
     dest.Copy(src)
     dest.SetName(name)
 
-    dest.RemoveAllDisplayNodeIDs()
-
-    for n, displayNodeID in enumerate(displayNodesIDs):
-      dest.SetAndObserveNthDisplayNodeID(n, displayNodeID)
-    for n, storageNodeID in enumerate(storageNodesIDs):
-      dest.SetAndObserveNthStorageNodeID(n, storageNodeID)
+    if dest.IsA('vtkMRMLDisplayableNode'):
+      dest.RemoveAllDisplayNodeIDs()
+      for n, displayNodeID in enumerate(displayNodesIDs):
+        dest.SetAndObserveNthDisplayNodeID(n, displayNodeID)
+      for n, storageNodeID in enumerate(storageNodesIDs):
+        dest.SetAndObserveNthStorageNodeID(n, storageNodeID)
 
 #
 # PipelineCreator
@@ -188,15 +189,16 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       desiredOutputNode = self.ui.cboxTestOutput.currentNode()
       if desiredOutputNode is None:
         raise Exception("An output node must be chosen")
-      desiredOutputNode.CreateDefaultDisplayNodes()
+      if desiredOutputNode.IsA('vtkMRMLDisplayableNode'):
+        desiredOutputNode.CreateDefaultDisplayNodes()
 
       self._runPipelineProgressDialog = slicer.util.createProgressDialog()
       actualOutputNode = self.logic.runPipeline(modules, inputNode)
       CloneInto(actualOutputNode, desiredOutputNode)
 
-      if inputNode.GetDisplayNode() is not None:
+      if inputNode.IsA('vtkMRMLDisplayableNode') and inputNode.GetDisplayNode() is not None:
         inputNode.GetDisplayNode().SetVisibility(False)
-      if desiredOutputNode.GetDisplayNode() is not None:
+      if desiredOutputNode.IsA('vtkMRMLDisplayableNode') and desiredOutputNode.GetDisplayNode() is not None:
         desiredOutputNode.GetDisplayNode().SetVisibility(True)
       slicer.mrmlScene.RemoveNode(actualOutputNode)
 
