@@ -110,3 +110,9 @@ vtkMRMLAbstractLogic* qSlicerPipelineCLIBridgeModule::createLogic()
 {
   return nullptr;
 }
+
+//-----------------------------------------------------------------------------
+bool qSlicerPipelineCLIBridgeModule::isHidden() const
+{
+  return true;
+}
