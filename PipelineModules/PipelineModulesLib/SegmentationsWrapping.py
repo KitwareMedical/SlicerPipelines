@@ -84,3 +84,32 @@ class ConvertModelToSegmentation(SinglePiecePipeline):
       #TODO: should we delete the volume node if the segmentation node is deleted?
 
       return segmentationNode
+
+@slicerPipeline
+class ExportSegmentationToLabelMap(SinglePiecePipeline):
+  @staticmethod
+  def GetName():
+    return "ExportSegmentationToLabelMap"
+  @staticmethod
+  def GetInputType():
+    return 'vtkMRMLSegmentationNode'
+  @staticmethod
+  def GetOutputType():
+    return 'vtkMRMLLabelMapVolumeNode'
+  @staticmethod
+  def GetDependencies():
+    return ['Segmentations']
+  @staticmethod
+  def GetParameters():
+    return []
+  
+  def __init__(self):
+    super().__init__()
+
+  def _RunImpl(self, inputNode):
+    outputNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLLabelMapVolumeNode')
+    slicer.modules.segmentations.logic().ExportAllSegmentsToLabelmapNode(
+      inputNode,
+      outputNode,
+      slicer.vtkSegmentation.EXTENT_REFERENCE_GEOMETRY)
+    return outputNode
