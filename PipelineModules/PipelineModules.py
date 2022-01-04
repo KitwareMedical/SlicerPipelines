@@ -39,6 +39,7 @@ class PipelineModules(ScriptedLoadableModule):
 This module exists to create pipelines for the PipelineCreator to use.
 """
     self.parent.acknowledgementText = ""
+    self.parent.hidden = True
 
 #
 # PipelineModulesLogic
