@@ -23,13 +23,18 @@ ConfigureBridge(qSlicerPipelineCLIModulesFloatBridgeParameter float float)
 ConfigureBridge(qSlicerPipelineCLIModulesDoubleBridgeParameter double double)
 ConfigureBridge(qSlicerPipelineCLIModulesBooleanBridgeParameter bool boolean)
 ConfigureBridge(qSlicerPipelineCLIModulesStringBridgeParameter QString string)
+
 ConfigureBridge(qSlicerPipelineCLIModulesIntegerVectorBridgeParameter std::vector<int> integer-vector)
 ConfigureBridge(qSlicerPipelineCLIModulesFloatVectorBridgeParameter std::vector<float> float-vector)
 ConfigureBridge(qSlicerPipelineCLIModulesDoubleVectorBridgeParameter std::vector<double> double-vector)
-
 #having issues with using std::vector<QString> or QVector<QString> as a return from C++ to Python.
 #will be returned as a comma separated string
 ConfigureBridge(qSlicerPipelineCLIModulesStringVectorBridgeParameter QString string-vector)
+
+ConfigureBridge(qSlicerPipelineCLIModulesIntegerEnumerationBridgeParameter int integer-enumeration)
+ConfigureBridge(qSlicerPipelineCLIModulesFloatEnumerationBridgeParameter float float-enumeration)
+ConfigureBridge(qSlicerPipelineCLIModulesDoubleEnumerationBridgeParameter double double-enumeration)
+ConfigureBridge(qSlicerPipelineCLIModulesStringEnumerationBridgeParameter QString string-enumeration)
 
 set(KIT ${PROJECT_NAME})
 
@@ -56,6 +61,7 @@ set(${KIT}_SRCS
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesBooleanBridgeParameter.h
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesStringBridgeParameter.cxx
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesStringBridgeParameter.h
+
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesIntegerVectorBridgeParameter.cxx
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesIntegerVectorBridgeParameter.h
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesFloatVectorBridgeParameter.cxx
@@ -64,6 +70,15 @@ set(${KIT}_SRCS
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesDoubleVectorBridgeParameter.h
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesStringVectorBridgeParameter.cxx
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesStringVectorBridgeParameter.h
+
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesIntegerEnumerationBridgeParameter.cxx
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesIntegerEnumerationBridgeParameter.h
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesFloatEnumerationBridgeParameter.cxx
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesFloatEnumerationBridgeParameter.h
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesDoubleEnumerationBridgeParameter.cxx
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesDoubleEnumerationBridgeParameter.h
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesStringEnumerationBridgeParameter.cxx
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesStringEnumerationBridgeParameter.h
   )
 
 set(${KIT}_MOC_SRCS
@@ -75,10 +90,16 @@ set(${KIT}_MOC_SRCS
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesDoubleBridgeParameter.h
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesBooleanBridgeParameter.h
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesStringBridgeParameter.h
+
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesIntegerVectorBridgeParameter.h
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesFloatVectorBridgeParameter.h
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesDoubleVectorBridgeParameter.h
   ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesStringVectorBridgeParameter.h
+
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesIntegerEnumerationBridgeParameter.h
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesFloatEnumerationBridgeParameter.h
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesDoubleEnumerationBridgeParameter.h
+  ${CMAKE_CURRENT_BINARY_DIR}/qSlicerPipelineCLIModulesStringEnumerationBridgeParameter.h
   )
 
 set(${KIT}_UI_SRCS

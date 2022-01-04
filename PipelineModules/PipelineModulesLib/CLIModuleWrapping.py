@@ -1,8 +1,10 @@
 import collections
 import enum
 import re
+from PipelineModulesLib.Util import ScopedNode
 
 import slicer
+import vtk
 from PipelineCreatorLib.PipelineBases import SinglePiecePipeline # Note: this import may show up as unused in linting, but it is needed for the exec calls to work
 
 class BridgeParameterWrapper:
@@ -34,7 +36,7 @@ def toChannelsEnum(channelString):
   raise Exception("Unknown channel: " + channelString)
 
 CLIParameter = collections.namedtuple("CLIParameter",
-  "name pipelineParameterName label tag channel ptype")
+  "name pipelineParameterName label tag channel ptype multiple")
 
 def getCLIParameters(cliNode):
   parameters = []
@@ -47,6 +49,7 @@ def getCLIParameters(cliNode):
         tag=cliNode.GetParameterTag(i,j),
         channel=toChannelsEnum(cliNode.GetParameterChannel(i,j)),
         ptype=cliNode.GetParameterType(i,j),
+        multiple=cliNode.GetParameterMultiple(i,j).lower() in ('true', '1'),
       ))
   return parameters
 
@@ -58,6 +61,8 @@ def cliParameterToMRMLType(cliParameter):
     + " Please consider adding support."
   if cliParameter.tag == "geometry":
     if cliParameter.ptype in ("scalar", "model"):
+      if cliParameter.multiple: # no way to do "and cliParameter.aggregate"
+        return "vtkMRMLModelHierarchyNode"
       return "vtkMRMLModelNode"
     else:
       raise Exception("Unknown geometry type: " + cliParameter.ptype + disclaimer)
@@ -70,16 +75,13 @@ def cliParameterToMRMLType(cliParameter):
       raise Exception("Unknown image type: " + cliParameter.ptype + disclaimer)
   else:
     raise Exception("Unknown tag: " + cliParameter.tag + disclaimer)
+
 currentlyUnsupportedTags = [
   'point',
   'pointfile',
   'region',
   'table',
   'transform',
-  'integer-enumeration',
-  'float-enumeration',
-  'double-enumeration',
-  'string-enumeration',
   'file',
   'directory',
 ]
@@ -114,9 +116,95 @@ def cliToPipelineParameters(factory, cliParameters, excludeParameterNames=None):
 _invalidCharactersRe = re.compile("[^a-zA-Z1-9_]")
 def _fixupModuleName(name):
   return _invalidCharactersRe.sub('', name)
-  
+
+#if this name changes, change parentClass in PipelineCLI
+class DefaultOutputCLI(SinglePiecePipeline):
+  def __init__(self):
+    super().__init__()
+
+  def _RunImpl(self, input):
+    self._SetInput(input)
+    output = slicer.mrmlScene.AddNewNodeByClass(self.GetOutputType())
+    if output.IsA('vtkMRMLDisplayableNode'):
+      output.CreateDefaultDisplayNodes()
+    self._SetOutput(output)
+    with ScopedNode(slicer.cli.runSync(self.GetModule(), parameters=self._parameters)) as cliNode:
+      if cliNode.GetStatus() & cliNode.ErrorsMask:
+        #error
+        text = cliNode.GetErrorText()
+        raise Exception("CLI execution failed for "
+          + self.GetModule().name + ": " + text)
+    return output
+
+#if this name changes, change parentClass in PipelineCLI
+class ModelHierarchyOutputCLI(SinglePiecePipeline):
+  def __init__(self):
+    super().__init__()
+    self._hierarchyName = None
+
+  def _nameExists(self, name):
+    shNode = slicer.mrmlScene.GetSubjectHierarchyNode()
+    sceneItemID = shNode.GetSceneItemID()
+    return any([
+      slicer.mrmlScene.GetNodesByName(name).GetNumberOfItems() > 0,
+      shNode.GetItemChildWithName(sceneItemID, name) != 0,
+    ])
+
+  def _RunImpl(self, input):
+    '''
+    When a CLI modules has a model hierarchy as its output, the model hierarchy is imported into the
+    scene, which will delete the model hierarchy node and put all of its models into a subject
+    hierarchy folder with the same name the model hierarchy had.
+
+    So we create the model hierarchy with a name that is completely unique, then after the cli run
+    we find the subject hierarchy folder with that name and grab the first model out of it.
+    '''
+    if self.GetOutputType() != 'vtkMRMLModelNode':
+      raise Exception("Unable to run model hierarchy output CLI that doesn't have model as output")
+
+    self._SetInput(input)
+    modelHierarchy = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLModelHierarchyNode')
+    basename = self.GetName() + "Models"
+    self._hierarchyName = basename
+    index = 0
+    while self._nameExists(self._hierarchyName):
+      index += 1
+      self._hierarchyName = basename + str(index)
+
+    modelHierarchy.SetName(self._hierarchyName)
+    self._SetOutput(modelHierarchy)
+
+    with ScopedNode(slicer.cli.runSync(self.GetModule(), parameters=self._parameters)) as cliNode:
+      if cliNode.GetStatus() & cliNode.ErrorsMask:
+        #error
+        slicer.mrmlScene.RemoveNode(modelHierarchy)
+        text = cliNode.GetErrorText()
+        raise Exception("CLI execution failed for "
+          + self.GetModule().name + ": " + text)
+
+    # get output model
+    shNode = slicer.mrmlScene.GetSubjectHierarchyNode()
+    sceneItemID = shNode.GetSceneItemID()
+    modelsFolderId = shNode.GetItemChildWithName(sceneItemID, self._hierarchyName)
+    if modelsFolderId == 0:
+      raise Exception(self.GetName() + ": Unable to find created models")
+
+    children = vtk.vtkIdList()
+    shNode.GetItemChildren(modelsFolderId, children)
+    if children.GetNumberOfIds() == 0:
+      raise Exception(self.GetName() + ": No models were created")
+
+    outputShId = children.GetId(0)
+
+    slicer.mrmlScene.RemoveNode(modelHierarchy) # this is unnecessary as of this writing, but adding for future safety
+    shNode.SetItemParent(outputShId, shNode.GetItemParent(modelsFolderId))
+
+    shNode.RemoveItem(modelsFolderId)
+
+    return shNode.GetItemDataNode(outputShId)
+
 _pipelineClassTemplate = '''
-class PipelineWrapper_{fixupModuleName}(SinglePiecePipeline):
+class PipelineWrapper_{fixupModuleName}({parentClass}):
   @staticmethod
   def GetName():
     return '{moduleName}'
@@ -141,21 +229,11 @@ class PipelineWrapper_{fixupModuleName}(SinglePiecePipeline):
     super().__init__()
     self._parameters = dict()
 
-  def _RunImpl(self, input):
+  def _SetInput(self, input):
     self.Set{inputParameter}(input)
-    output = slicer.mrmlScene.AddNewNodeByClass(self.GetOutputType())
-    output.CreateDefaultDisplayNodes()
+
+  def _SetOutput(self, output):
     self.Set{outputParameter}(output)
-    cliNode = slicer.cli.runSync(self.GetModule(), parameters=self._parameters)
-    if cliNode.GetStatus() & cliNode.ErrorsMask:
-      #error
-      slicer.mrmlScene.RemoveNode(output)
-      text = cliNode.GetErrorText()
-      slicer.mrmlScene.RemoveNode(cliNode)
-      raise Exception("CLI execution failed for "
-        + self.GetModule().name + ": " + text)
-    slicer.mrmlScene.RemoveNode(cliNode)
-    return output
 '''
 
 def _deducePipelineRunArg(cliParameters, channel):
@@ -181,13 +259,21 @@ def PipelineCLI(cliModule, pipelineCreatorLogic, inputArgName=None, outputArgNam
 
   fixupModuleName = _fixupModuleName(cliModule.name)
 
+  parentClass = "DefaultOutputCLI"
+  outputType = cliParameterToMRMLType(outputArg)
+
+  if outputType == "vtkMRMLModelHierarchyNode":
+    parentClass = "ModelHierarchyOutputCLI"
+    outputType = "vtkMRMLModelNode"
+
   classDef = _pipelineClassTemplate.format(
     moduleName=cliModule.name,
     fixupModuleName=fixupModuleName,
     inputParameter=inputArg.pipelineParameterName,
     outputParameter=outputArg.pipelineParameterName,
     inputType=cliParameterToMRMLType(inputArg),
-    outputType=cliParameterToMRMLType(outputArg),
+    outputType=outputType,
+    parentClass=parentClass
   )
 
   # We need the class to exist in the __main__ namespace so we can pickle it

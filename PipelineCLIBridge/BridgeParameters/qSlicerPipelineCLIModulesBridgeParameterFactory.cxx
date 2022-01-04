@@ -26,10 +26,16 @@
 #include "qSlicerPipelineCLIModulesDoubleBridgeParameter.h"
 #include "qSlicerPipelineCLIModulesBooleanBridgeParameter.h"
 #include "qSlicerPipelineCLIModulesStringBridgeParameter.h"
+
 #include "qSlicerPipelineCLIModulesIntegerVectorBridgeParameter.h"
 #include "qSlicerPipelineCLIModulesFloatVectorBridgeParameter.h"
 #include "qSlicerPipelineCLIModulesDoubleVectorBridgeParameter.h"
 #include "qSlicerPipelineCLIModulesStringVectorBridgeParameter.h"
+
+#include "qSlicerPipelineCLIModulesIntegerEnumerationBridgeParameter.h"
+#include "qSlicerPipelineCLIModulesFloatEnumerationBridgeParameter.h"
+#include "qSlicerPipelineCLIModulesDoubleEnumerationBridgeParameter.h"
+#include "qSlicerPipelineCLIModulesStringEnumerationBridgeParameter.h"
 
 #include <qSlicerCoreApplication.h>
 #include <vtkSlicerCLIModuleLogic.h>
@@ -117,7 +123,8 @@ qSlicerPipelineCLIModulesBridgeParameter* qSlicerPipelineCLIModulesBridgeParamet
     return d->createAndInitialize<qSlicerPipelineCLIModulesBooleanBridgeParameter>(moduleParameter);
   } else if (!multiple && moduleParameter.GetTag() == "string") {
     return d->createAndInitialize<qSlicerPipelineCLIModulesStringBridgeParameter>(moduleParameter);
-  } else if ((!multiple && moduleParameter.GetTag() == "integer-vector") || (multiple && moduleParameter.GetTag() == "integer")) {
+  }
+  else if ((!multiple && moduleParameter.GetTag() == "integer-vector") || (multiple && moduleParameter.GetTag() == "integer")) {
     return d->createAndInitialize<qSlicerPipelineCLIModulesIntegerVectorBridgeParameter>(moduleParameter);
   } else if ((!multiple && moduleParameter.GetTag() == "float-vector") || (multiple && moduleParameter.GetTag() == "float")) {
     return d->createAndInitialize<qSlicerPipelineCLIModulesFloatVectorBridgeParameter>(moduleParameter);
@@ -125,7 +132,17 @@ qSlicerPipelineCLIModulesBridgeParameter* qSlicerPipelineCLIModulesBridgeParamet
     return d->createAndInitialize<qSlicerPipelineCLIModulesDoubleVectorBridgeParameter>(moduleParameter);
   } else if ((!multiple && moduleParameter.GetTag() == "string-vector") || (multiple && moduleParameter.GetTag() == "string")) {
     return d->createAndInitialize<qSlicerPipelineCLIModulesStringVectorBridgeParameter>(moduleParameter);
-  } else {
+  }
+  else if (!multiple && moduleParameter.GetTag() == "integer-enumeration") {
+    return d->createAndInitialize<qSlicerPipelineCLIModulesIntegerEnumerationBridgeParameter>(moduleParameter);
+  } else if (!multiple && moduleParameter.GetTag() == "float-enumeration") {
+    return d->createAndInitialize<qSlicerPipelineCLIModulesFloatEnumerationBridgeParameter>(moduleParameter);
+  } else if (!multiple && moduleParameter.GetTag() == "double-enumeration") {
+    return d->createAndInitialize<qSlicerPipelineCLIModulesDoubleEnumerationBridgeParameter>(moduleParameter);
+  } else if (!multiple && moduleParameter.GetTag() == "string-enumeration") {
+    return d->createAndInitialize<qSlicerPipelineCLIModulesStringEnumerationBridgeParameter>(moduleParameter);
+  }
+  else {
     std::stringstream ss;
     ss << "Unknown parameter: " << moduleParameter.GetName() << " of type "
       << (multiple ? std::string("multiple ") : std::string("")) << moduleParameter.GetTag() << std::endl;
