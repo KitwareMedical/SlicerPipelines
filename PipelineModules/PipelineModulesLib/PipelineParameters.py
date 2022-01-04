@@ -224,7 +224,7 @@ class FloatRangeParameter(object):
   def GetUI(self):
     return self._hlayout
   def GetValue(self):
-    return (self._minimumSpinbox.minimumValue, self._maximumSpinbox.maximumValue)
+    return (self._minimumSpinbox.value, self._maximumSpinbox.value)
 
 class FloatRangeParameterWithSlider(object):
   def __init__(self, minimumValue=None, maximumValue=None, minimum=None, maximum=None,
