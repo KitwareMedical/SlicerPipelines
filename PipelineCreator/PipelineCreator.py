@@ -440,6 +440,9 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     if self._runPipelineProgressCb is not None:
       self._runPipelineProgressCb(pipelineProgress)
 
+  def _moduleExists(self, name):
+    return name.lower() in [m.lower() for m in slicer.app.moduleManager().modulesNames()]
+
   def createPipeline(self, pipelineName, outputDirectory, modules):
     """
     modules is [(moduleName, {module-parameter-name: module-parameter-value})]
@@ -452,6 +455,9 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     if not pipelineName.isidentifier() or keyword.iskeyword(pipelineName.lower()) or keyword.iskeyword(pipelineName):
       errorStr += " - Module name '%s' is not a valid pipeline module name\n" % (pipelineName + '/' + pipelineName.lower() if pipelineName else "")
       errorStr += "   Acceptable names start with a letter, contain only letters, numbers, and underscores, and cannot be a python keyword\n"
+
+    if self._moduleExists(pipelineName):
+      errorStr += " - Module name '%s' already exists. Note module names are effectively case insensitive.\n"
 
     if not modules:
       errorStr += " - Must have at least one module\n"
