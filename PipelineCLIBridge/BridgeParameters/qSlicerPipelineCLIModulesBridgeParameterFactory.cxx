@@ -55,16 +55,14 @@ public:
   virtual void setupUi(qSlicerPipelineCLIModulesBridgeParameterFactory*);
 
   vtkMRMLCommandLineModuleNode* CliNode;
-  // owns these only because ownership semantics between Python and C++ is difficult
-  std::vector<std::shared_ptr<qSlicerPipelineCLIModulesBridgeParameter>> Parameters;
 
   template <class T>
   T* createAndInitialize(const ModuleParameter& moduleParameter) {
-    auto p = std::make_shared<T>();
+    // temporarily store in unique ptr in case Initialize throws (it shouldn't)
+    auto p = std::unique_ptr<T>(new T);
     try {
       p->Initialize(moduleParameter);
-      this->Parameters.push_back(p);
-      return p.get();
+      return p.release();
     } catch (...) {
       throw;
     }
