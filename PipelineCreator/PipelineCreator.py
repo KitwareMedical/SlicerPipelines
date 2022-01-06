@@ -193,6 +193,8 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         desiredOutputNode.CreateDefaultDisplayNodes()
 
       self._runPipelineProgressDialog = slicer.util.createProgressDialog()
+      self._runPipelineProgressDialog.setCancelButton(None)
+      self._runPipelineProgressDialog.setWindowFlags(qt.Qt.Window | qt.Qt.WindowTitleHint | qt.Qt.CustomizeWindowHint)
       actualOutputNode = self.logic.runPipeline(modules, inputNode)
       CloneInto(actualOutputNode, desiredOutputNode)
 
