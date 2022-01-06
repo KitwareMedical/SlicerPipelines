@@ -9,12 +9,13 @@ from PipelineCreatorLib.PipelineBases import SinglePiecePipeline # Note: this im
 
 class BridgeParameterWrapper:
   '''
-  The whole point of this class is to keep a reference to the factory as long as the brideParameter is alive
-  since once the factory goes away, so does the bridgeParameter (in C++ land)
+  The whole point of this class is to delete the bridgeParameter (which was returned from C++ land
+  as an owning pointer) when we are done with it
   '''
-  def __init__(self, factory, bridgeParameter):
-    self._factory = factory
+  def __init__(self, bridgeParameter):
     self._bridgeParameter = bridgeParameter
+  def __del__(self):
+    self._bridgeParameter.deleteThis()
   def GetValue(self):
     return self._bridgeParameter.GetValue()
   def GetUI(self):
@@ -107,7 +108,7 @@ def cliToPipelineParameters(factory, cliParameters, excludeParameterNames=None):
   parameters = []
   for param in cliParameters:
     if not param.name in excludeParameterNames:
-      paramWrapper = BridgeParameterWrapper(factory, factory.CreateParameterWrapper(param.name))
+      paramWrapper = BridgeParameterWrapper(factory.CreateParameterWrapper(param.name))
       if paramWrapper is None:
         raise Exception("Error paramWrapper should not be None. Did you load a module into the factory?")
       parameters.append((param.pipelineParameterName, param.label, paramWrapper))

@@ -32,6 +32,11 @@ qSlicerPipelineCLIModulesBridgeParameter
 
 //-----------------------------------------------------------------------------
 qSlicerPipelineCLIModulesBridgeParameter
-::~qSlicerPipelineCLIModulesBridgeParameter()
+::~qSlicerPipelineCLIModulesBridgeParameter() = default;
+
+//-----------------------------------------------------------------------------
+void qSlicerPipelineCLIModulesBridgeParameter
+::deleteThis()
 {
+  delete this;
 }

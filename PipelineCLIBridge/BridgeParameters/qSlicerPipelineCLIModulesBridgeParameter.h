@@ -132,6 +132,8 @@ public:
   typedef QObject Superclass;
   qSlicerPipelineCLIModulesBridgeParameter(QObject *parent = nullptr);
   virtual ~qSlicerPipelineCLIModulesBridgeParameter();
+
+  Q_INVOKABLE void deleteThis();
 private:
   Q_DISABLE_COPY(qSlicerPipelineCLIModulesBridgeParameter);
 };

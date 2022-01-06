@@ -240,6 +240,9 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     Called when the application closes and the module widget is destroyed.
     """
     self.removeObservers()
+    # if we don't clear this on cleanup, then the whole application segfaults during shutdown if
+    # any CLI modules are still in the list
+    self._moduleListWidget.clear()
 
   def enter(self):
     """
