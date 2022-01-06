@@ -11,7 +11,7 @@ from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 from PipelineCreator import PipelineCreatorLogic
 from PipelineCreatorLib.Asynchrony import Asynchrony
-from PipelineModulesLib.Util import ScopedNode, ScopedDefaultStorageNode
+from PipelineModulesLib.Util import ScopedNode, ScopedDefaultStorageNode, human_sorted
 
 # overall - int 0-100 with current overall progress
 # currentPipeline - int 0-100 with progress of currently running pipeline
@@ -70,7 +70,7 @@ class PipelineCaseIteratorRunner(object):
       self._timestamp = datetime.datetime.now().strftime(self._timestampFormat)
     self._pipeline.SetProgressCallback(self._setPipelineProgress)
     try:
-      filenames = os.listdir(self._inputDirectory)
+      filenames = human_sorted(os.listdir(self._inputDirectory))
       self._progressHelper.numberOfFiles = len(filenames)
       for index, filename in enumerate(filenames):
         self._progressHelper.currentFileIndex = index
