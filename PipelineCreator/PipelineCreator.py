@@ -457,7 +457,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       errorStr += "   Acceptable names start with a letter, contain only letters, numbers, and underscores, and cannot be a python keyword\n"
 
     if self._moduleExists(pipelineName):
-      errorStr += " - Module name '%s' already exists. Note module names are effectively case insensitive.\n"
+      errorStr += " - Module name '%s' already exists. Note module names are effectively case insensitive.\n" % pipelineName
 
     if not modules:
       errorStr += " - Must have at least one module\n"
