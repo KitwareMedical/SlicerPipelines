@@ -1,5 +1,4 @@
 import copy
-import itertools
 import keyword
 import os
 import pickle
@@ -172,9 +171,36 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       moduleName = self.ui.leModuleName.text
       outputDirectory = self.ui.leOutputDirectory.text
       self.logic.createPipeline(moduleName, outputDirectory, modules)
+
       msgbox = qt.QMessageBox()
       msgbox.setWindowTitle("SUCCESS")
       msgbox.setText("Successfully created Pipeline '%s' at '%s'!" % (moduleName, outputDirectory))
+
+      try:
+        # add to currently loaded modules
+        if self.ui.chkboxLoadModuleOnCreation.isChecked():
+          factory = slicer.app.moduleManager().factoryManager()
+          factory.registerModule(qt.QFileInfo(os.path.join(outputDirectory, moduleName + ".py")))
+          factory.loadModules([moduleName])
+
+        # add to additional search paths
+        if self.ui.chkboxAddToAdditionalModulePaths.isChecked():
+          settings = slicer.app.revisionUserSettings()
+
+          rawSearchPaths = settings.value("Modules/AdditionalPaths") or []
+          if isinstance(rawSearchPaths, str):
+            rawSearchPaths = [rawSearchPaths]
+          if not isinstance(rawSearchPaths, list):
+            # if it returns a tuple or other iterable, make it a list
+            rawSearchPaths = list(rawSearchPaths)
+
+          if outputDirectory not in [qt.QDir(rawPath) for rawPath in rawSearchPaths]:
+            rawSearchPaths.append(outputDirectory)
+            settings.setValue("Modules/AdditionalPaths", rawSearchPaths)
+      except Exception as e:
+        msgbox.setWindowTitle("Partial Success")
+        msgbox.setText(msgbox.text + "\n Post creation failure: " + str(e))
+
       msgbox.exec()
     except Exception as e:
       msgbox = qt.QMessageBox()
