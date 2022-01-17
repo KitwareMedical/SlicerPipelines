@@ -32,7 +32,7 @@ class ConvertModelToSegmentation(SinglePiecePipeline):
       return 'vtkMRMLSegmentationNode'
     @staticmethod
     def GetDependencies():
-      return ['Segmentations']
+      return ['Segmentations', 'Models']
 
     def __init__(self):
       super().__init__()
@@ -86,10 +86,47 @@ class ConvertModelToSegmentation(SinglePiecePipeline):
       return segmentationNode
 
 @slicerPipeline
+class ExportSegmentationToModel(SinglePiecePipeline):
+  @staticmethod
+  def GetName():
+    return "Export Segmentation to Model"
+  @staticmethod
+  def GetInputType():
+    return 'vtkMRMLSegmentationNode'
+  @staticmethod
+  def GetOutputType():
+    return 'vtkMRMLModelNode'
+  @staticmethod
+  def GetDependencies():
+    return ['Segmentations', 'Models']
+  @staticmethod
+  def GetParameters():
+    return []
+
+  def __init__(self):
+    super().__init__()
+
+  def _RunImpl(self, inputNode):
+    shNode = slicer.mrmlScene.GetSubjectHierarchyNode()
+    exportFolderItemId = shNode.CreateFolderItem(shNode.GetSceneItemID(), "TempSegmentToModel")
+    slicer.modules.segmentations.logic().ExportAllSegmentsToModels(inputNode, exportFolderItemId)
+
+    children = vtk.vtkIdList()
+    shNode.GetItemChildren(exportFolderItemId, children)
+    if children.GetNumberOfIds() == 0:
+      raise Exception(self.GetName() + ": No models were created")
+
+    modelShId = children.GetId(0)
+    shNode.SetItemParent(modelShId, shNode.GetItemParent(exportFolderItemId))
+    shNode.RemoveItem(exportFolderItemId)
+
+    return shNode.GetItemDataNode(modelShId)
+
+@slicerPipeline
 class ExportSegmentationToLabelMap(SinglePiecePipeline):
   @staticmethod
   def GetName():
-    return "ExportSegmentationToLabelMap"
+    return "Export Segmentation to LabelMap"
   @staticmethod
   def GetInputType():
     return 'vtkMRMLSegmentationNode'
