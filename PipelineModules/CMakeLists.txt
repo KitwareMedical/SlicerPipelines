@@ -10,6 +10,7 @@ set(MODULE_PYTHON_SCRIPTS
   PipelineModulesLib/SegmentEditorWrapping.py
   PipelineModulesLib/SurfaceToolboxWrapping.py
   PipelineModulesLib/Util.py
+  PipelineModulesLib/VolumesWrapping.py
   PipelineModulesLib/vtkFilterJSONReader.py
   )
 
