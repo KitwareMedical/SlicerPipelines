@@ -11,6 +11,7 @@ from PipelineModulesLib import (
   SegmentationsWrapping,
   SegmentEditorWrapping,
   SurfaceToolboxWrapping,
+  VolumesWrapping,
   vtkFilterJSONReader,
 )
 
