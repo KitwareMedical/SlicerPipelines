@@ -22,7 +22,8 @@ class SelectModulePopUp(qt.QDialog):
 
     #input type
     self.cboxInputType = qt.QComboBox()
-    self.cboxInputType.addItems(sorted(list(set([x.GetInputType() for x in self._availableModules]))))
+    items = sorted(list(set([x.GetInputType() for x in self._availableModules])))
+    self.cboxInputType.addItems(items)
     self.cboxInputType.currentTextChanged.connect(self._updateListWidget)
     self.formLayout.addRow("Input Type:", self.cboxInputType)
 
@@ -58,6 +59,11 @@ class SelectModulePopUp(qt.QDialog):
     self.masterLayout.addItem(verticalSpacer)
 
     #ui is ready. initialize state
+    if defaultInput is not None:
+      try:
+        self.cboxInputType.setCurrentIndex(items.index(defaultInput))
+      except ValueError:
+        pass
     self._updateListWidget()
 
   def _updateListWidget(self):
