@@ -135,7 +135,7 @@ class ExportSegmentationToLabelMap(SinglePiecePipeline):
     return 'vtkMRMLLabelMapVolumeNode'
   @staticmethod
   def GetDependencies():
-    return ['Segmentations']
+    return ['Segmentations', 'Volumes']
   @staticmethod
   def GetParameters():
     return []
@@ -150,3 +150,30 @@ class ExportSegmentationToLabelMap(SinglePiecePipeline):
       outputNode,
       slicer.vtkSegmentation.EXTENT_REFERENCE_GEOMETRY)
     return outputNode
+
+@slicerPipeline
+class ExportLabelMapVolumeToSegmentation(SinglePiecePipeline):
+  @staticmethod
+  def GetName():
+    return "Export LabelMap Volume to Segmentation"
+  @staticmethod
+  def GetInputType():
+    return 'vtkMRMLLabelMapVolumeNode'
+  @staticmethod
+  def GetOutputType():
+    return 'vtkMRMLSegmentationNode'
+  @staticmethod
+  def GetDependencies():
+    return ['Segmentations', 'Volumes']
+  @staticmethod
+  def GetParameters():
+    return []
+  
+  def __init__(self):
+    super().__init__()
+
+  def _RunImpl(self, inputNode):
+    seg = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
+    slicer.modules.segmentations.logic().ImportLabelmapToSegmentationNode(inputNode, seg)
+    seg.CreateClosedSurfaceRepresentation()
+    return seg
