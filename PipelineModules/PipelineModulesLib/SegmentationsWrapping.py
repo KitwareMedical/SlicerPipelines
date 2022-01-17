@@ -6,23 +6,23 @@ from PipelineCreatorLib.PipelineBases import SinglePiecePipeline
 from .PipelineParameters import FloatParameterWithSlider, StringParameter
 
 @slicerPipeline
-class ConvertModelToSegmentation(SinglePiecePipeline):
+class ExportModelToSegmentation(SinglePiecePipeline):
     DefaultVolumeName = "PipelineSegmentationVolume"
     DefaultVolumeSpacing = [0.2, 0.2, 0.2]
     DefaultVolumeMargin = [10.0, 10.0, 10.0]
     @staticmethod
     def GetName():
-      return "ConvertModelToSegmentation"
+      return "Export Model to Segmentation"
     @staticmethod
     def GetParameters():
       return [
-        ('Volume Name', StringParameter(defaultText=ConvertModelToSegmentation.DefaultVolumeName, placeholderText="Enter a name")),
-        ('Volume Spacing X', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeSpacing[0], minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
-        ('Volume Spacing Y', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeSpacing[1], minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
-        ('Volume Spacing Z', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeSpacing[2], minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
-        ('Volume Margin X', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeMargin[0], minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
-        ('Volume Margin Y', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeMargin[1], minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
-        ('Volume Margin Z', FloatParameterWithSlider(value=ConvertModelToSegmentation.DefaultVolumeMargin[2], minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
+        ('Volume Name', StringParameter(defaultText=ExportModelToSegmentation.DefaultVolumeName, placeholderText="Enter a name")),
+        ('Volume Spacing X', FloatParameterWithSlider(value=ExportModelToSegmentation.DefaultVolumeSpacing[0], minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
+        ('Volume Spacing Y', FloatParameterWithSlider(value=ExportModelToSegmentation.DefaultVolumeSpacing[1], minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
+        ('Volume Spacing Z', FloatParameterWithSlider(value=ExportModelToSegmentation.DefaultVolumeSpacing[2], minimum=0.01, maximum=5, singleStep=0.01, decimals=2, suffix='mm')),
+        ('Volume Margin X', FloatParameterWithSlider(value=ExportModelToSegmentation.DefaultVolumeMargin[0], minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
+        ('Volume Margin Y', FloatParameterWithSlider(value=ExportModelToSegmentation.DefaultVolumeMargin[1], minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
+        ('Volume Margin Z', FloatParameterWithSlider(value=ExportModelToSegmentation.DefaultVolumeMargin[2], minimum=0.1, maximum=20, singleStep=0.1, decimals=1, suffix='mm')),
       ]
     @staticmethod
     def GetInputType():
@@ -37,8 +37,8 @@ class ConvertModelToSegmentation(SinglePiecePipeline):
     def __init__(self):
       super().__init__()
       self._volumeName = self.DefaultVolumeName
-      self._volumeSpacing = copy.deepcopy(ConvertModelToSegmentation.DefaultVolumeSpacing)
-      self._volumeMargin = copy.deepcopy(ConvertModelToSegmentation.DefaultVolumeMargin)
+      self._volumeSpacing = copy.deepcopy(ExportModelToSegmentation.DefaultVolumeSpacing)
+      self._volumeMargin = copy.deepcopy(ExportModelToSegmentation.DefaultVolumeMargin)
 
     def SetVolumeName(self, name):
       self._volumeName = name
