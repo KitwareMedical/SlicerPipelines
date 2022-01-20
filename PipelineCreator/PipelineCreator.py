@@ -399,7 +399,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
       self._allModules = PipelineCreatorLogic._allModules
       self.isSingletonParameterNode = True
     else:
-      self._allModules = {}
+      self._allModules = []
       self.isSingletonParameterNode = False
 
     self._pipeline = []
