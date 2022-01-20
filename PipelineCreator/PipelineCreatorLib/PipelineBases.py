@@ -32,7 +32,7 @@ class PipelineInterface(abc.ABC):
     pass
 
   @abc.abstractmethod
-  def Run(self, input):
+  def Run(self, inputNode):
     pass
 
   @abc.abstractmethod
@@ -73,11 +73,11 @@ class SinglePiecePipeline(ProgressablePipeline):
       return 1
 
   @abc.abstractmethod
-  def _RunImpl(self, input):
+  def _RunImpl(self, inputNode):
     pass
 
-  def Run(self, input):
+  def Run(self, inputNode):
     self._Progress(self.GetName(), 0)
-    output = self._RunImpl(input)
+    output = self._RunImpl(inputNode)
     self._Progress(self.GetName(), 1)
     return output
