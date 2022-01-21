@@ -61,8 +61,8 @@ class PipelineModulesLogic(ScriptedLoadableModuleLogic):
 
   def loadCLIModules(self, pipelineCreatorLogic):
     #important that all modules in here show up as dependencies in PipelineModules class
-    CLIModuleWrapping.PipelineCLI(slicer.modules.meshtolabelmap, pipelineCreatorLogic, "mesh", excludeArgs=['reference'])
-    CLIModuleWrapping.PipelineCLI(slicer.modules.modelmaker, pipelineCreatorLogic, excludeArgs=['ColorTable', 'ModelHierarchyFile'])
+    CLIModuleWrapping.PipelineCLINow(slicer.modules.meshtolabelmap, pipelineCreatorLogic, "mesh", excludeArgs=['reference'])
+    CLIModuleWrapping.PipelineCLINow(slicer.modules.modelmaker, pipelineCreatorLogic, excludeArgs=['ColorTable', 'ModelHierarchyFile'])
 
   def resourcePath(self, filename):
     scriptedModulesPath = os.path.dirname(slicer.util.modulePath(self.moduleName))
