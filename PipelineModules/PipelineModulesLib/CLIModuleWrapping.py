@@ -6,6 +6,7 @@ from PipelineModulesLib.Util import ScopedNode
 import slicer
 import vtk
 from PipelineCreatorLib.PipelineBases import SinglePiecePipeline # Note: this import may show up as unused in linting, but it is needed for the exec calls to work
+from PipelineCreator import CallAfterAllTheseModulesLoaded, PipelineCreatorLogic
 
 class BridgeParameterWrapper:
   '''
@@ -247,7 +248,11 @@ def _deducePipelineRunArg(cliParameters, channel):
 def getArgByName(cliParameters, name):
   return [p for p in cliParameters if p.name == name][0]
 
-def PipelineCLI(cliModule, pipelineCreatorLogic, inputArgName=None, outputArgName=None, excludeArgs=None):
+def PipelineCLINow(cliModule, pipelineCreatorLogic=None, inputArgName=None, outputArgName=None, excludeArgs=None):
+  if isinstance(cliModule, str):
+    cliModule = slicer.app.moduleManager().module(cliModule)
+
+  pipelineCreatorLogic = pipelineCreatorLogic or PipelineCreatorLogic()
   excludeArgs = excludeArgs or []
 
   cliNode = slicer.cli.createNode(cliModule)
@@ -312,3 +317,20 @@ def PipelineCLI(cliModule, pipelineCreatorLogic, inputArgName=None, outputArgNam
     setattr(cliPipeline, "Set" + param.pipelineParameterName, makeFunc(param))
 
   pipelineCreatorLogic.registerModule(cliPipeline)
+
+# Recommended use:
+#
+# try:
+#   from PipelineModulesLib.CLIModuleWrapping import PipelineCLI
+#   PipelineCLI("MeshToLabelMap", inputArgName="mesh", excludeArgs=['reference'])
+# except ImportError:
+#   pass
+def PipelineCLI(cliModuleName, pipelineCreatorLogic=None, inputArgName=None, outputArgName=None, excludeArgs=None):
+  def f():
+    PipelineCLINow(
+      slicer.app.moduleManager().module(cliModuleName),
+      pipelineCreatorLogic,
+      inputArgName,
+      outputArgName,
+      excludeArgs)
+  CallAfterAllTheseModulesLoaded(f, ["PipelineCreator", cliModuleName])
