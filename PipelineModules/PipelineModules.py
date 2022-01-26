@@ -15,6 +15,9 @@ from PipelineModulesLib import (
   vtkFilterJSONReader,
 )
 
+#note: if ModelMaker is not actually in the system, then this call will have no effect
+CLIModuleWrapping.PipelineCLI("ModelMaker", PipelineCreatorLogic(), excludeArgs=['ColorTable', 'ModelHierarchyFile'])
+
 #
 # PipelineModules
 #
@@ -58,11 +61,6 @@ class PipelineModulesLogic(ScriptedLoadableModuleLogic):
 
   def loadVTKJSON(self, pipelineCreatorLogic):
     vtkFilterJSONReader.RegisterPipelineModules(pipelineCreatorLogic, self.resourcePath('PipelineVTKFilterJSON'))
-
-  def loadCLIModules(self, pipelineCreatorLogic):
-    #important that all modules in here show up as dependencies in PipelineModules class
-    CLIModuleWrapping.PipelineCLINow(slicer.modules.meshtolabelmap, pipelineCreatorLogic, "mesh", excludeArgs=['reference'])
-    CLIModuleWrapping.PipelineCLINow(slicer.modules.modelmaker, pipelineCreatorLogic, excludeArgs=['ColorTable', 'ModelHierarchyFile'])
 
   def resourcePath(self, filename):
     scriptedModulesPath = os.path.dirname(slicer.util.modulePath(self.moduleName))
@@ -111,11 +109,7 @@ class PipelineModulesTest(ScriptedLoadableModuleTest):
     pass
 
 def _load():
-  pipelineCreator = PipelineCreatorLogic()
-  pipelineModules = PipelineModulesLogic()
-
-  pipelineModules.loadVTKJSON(pipelineCreator)
-  pipelineModules.loadCLIModules(pipelineCreator)
+  PipelineModulesLogic().loadVTKJSON(PipelineCreatorLogic())
 
 #load the vtk json files when able
 try:
