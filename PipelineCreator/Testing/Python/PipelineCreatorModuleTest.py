@@ -1,3 +1,6 @@
+import os
+import tempfile
+import textwrap
 import qt
 
 import slicer
@@ -5,6 +8,32 @@ import vtk
 from slicer.ScriptedLoadableModule import ScriptedLoadableModuleTest
 from PipelineCreator import PipelineCreatorLogic
 from PipelineCreatorLib.PipelineBases import PipelineInterface, ProgressablePipeline
+
+
+# these tests are bad because they leave pipeline modules hanging around,
+# but I didn't see a good way to unload single modules
+_pipelineNameCounter = 0
+# not thread safe
+def nextPipelineName():
+  global _pipelineNameCounter
+  _pipelineNameCounter += 1
+  return "PipelineCreatorModuleTest_Pipeline" + str(_pipelineNameCounter)
+
+def loadModule(name, path):
+  factory = slicer.app.moduleManager().factoryManager()
+  factory.registerModule(qt.QFileInfo(os.path.join(path, name + ".py")))
+  factory.loadModules([name])
+
+def getLogic(pipelineName):
+  codeToRun = textwrap.dedent('''
+    from {pipelineName} import {pipelineName}Logic
+    logic = {pipelineName}Logic()
+    ''').strip().format(
+      pipelineName=pipelineName,
+    )
+  localsParam = {}
+  exec(codeToRun, {}, localsParam)
+  return localsParam['logic']
 
 class Parameter(object):
   def __init__(self):
@@ -36,7 +65,7 @@ class TestPipeline1(PipelineInterface):
 
   @staticmethod
   def GetDependencies():
-    return []
+    return ['Models']
 
   def Run(self, inputNode):
     return slicer.mrmlScene.AddNewNodeByClass(self.GetOutputType())
@@ -76,7 +105,7 @@ class TestPipeline2(ProgressablePipeline):
 
   @staticmethod
   def GetDependencies():
-    return []
+    return ['Segmentations']
 
   def Run(self, inputNode):
     output = slicer.mrmlScene.AddNewNodeByClass(self.GetOutputType())
@@ -188,3 +217,49 @@ class PipelineCreatorModuleTest(ScriptedLoadableModuleTest):
     output = logic.runPipeline(pipeline, inputNode)
     self.assertIsInstance(output, slicer.vtkMRMLModelNode)
     self.assertIsNotNone(output.GetMesh())
+
+  def test_PipelineCreatorLogic_createPipeline1(self):
+    for doMesh in (True, False):
+      logic = self.createTesterPipelineCreator()
+      pipeline = [
+        ("TestPipeline1", {}),
+        ("TestPipeline2", {"HasMesh": doMesh}),
+      ]
+      pipelineName = nextPipelineName()
+
+      with tempfile.TemporaryDirectory(dir=slicer.app.temporaryPath) as pipelineDir:
+        # make the pipeline
+        self.assertFalse(os.listdir(pipelineDir))
+        logic.createPipeline(pipelineName, pipelineDir, pipeline)
+
+        # make sure we got something
+        self.assertTrue(os.listdir(pipelineDir))
+        loadModule(pipelineName, pipelineDir)
+
+        # load it
+        self.assertIn(pipelineName, slicer.app.moduleManager().modulesNames())
+        pipelineModule = slicer.app.moduleManager().module(pipelineName)
+        self.assertIsNotNone(pipelineModule)
+
+        # make sure it runs
+        logic = getLogic(pipelineName)
+        inputNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLModelNode')
+        output = logic.Run(inputNode)
+        self.assertIsInstance(output, slicer.vtkMRMLModelNode)
+        if doMesh:
+          self.assertIsNotNone(output.GetMesh())
+        else:
+          self.assertIsNone(output.GetMesh())
+
+        # we expect created pipelines to be PipelineInterface
+        self.assertIsInstance(logic, PipelineInterface)
+
+        # we expect dependencies to be a union of all pieces + pipelineCreator
+        expectedDepends = {'PipelineCreator', 'Models', 'Segmentations'}
+        self.assertEqual(expectedDepends, set(logic.GetDependencies()))
+
+        # check most of PipelineInterface
+        self.assertEqual(pipelineName, logic.GetName())
+        self.assertEqual('vtkMRMLModelNode', logic.GetInputType())
+        self.assertEqual('vtkMRMLModelNode', logic.GetOutputType())
+        self.assertEqual([], logic.GetParameters())
