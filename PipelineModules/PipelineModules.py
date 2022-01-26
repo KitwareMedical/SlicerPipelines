@@ -32,7 +32,6 @@ class PipelineModules(ScriptedLoadableModule):
     self.parent.title = "Pipeline Modules"
     self.parent.categories = ["Pipelines.Advanced"]
     self.parent.dependencies = [
-      "MeshToLabelMap",
       "PipelineCLIBridge",
       "PipelineCreator",
       "SegmentEditor",
