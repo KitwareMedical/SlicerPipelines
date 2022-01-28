@@ -1,3 +1,4 @@
+import keyword
 import os
 import tempfile
 import textwrap
@@ -119,6 +120,33 @@ class TestPipeline2(ProgressablePipeline):
   def GetNumberOfPieces():
     return 1
 
+class TestPipeline3(PipelineInterface):
+  @staticmethod
+  def GetName():
+    return "TestPipeline1"
+
+  @staticmethod
+  def GetParameters():
+    []
+
+  @staticmethod
+  def GetInputType():
+    return "vtkMRMLScalarVolumeNode"
+
+  @staticmethod
+  def GetOutputType():
+    return "vtkMRMLScalarVolumeNode"
+
+  @staticmethod
+  def GetDependencies():
+    return ['Volumes']
+
+  def Run(self, inputNode):
+    return slicer.mrmlScene.AddNewNodeByClass(self.GetOutputType())
+
+  def SetProgressCallback(self, cb):
+    pass
+
 #
 # PipelineCreatorTest
 #
@@ -217,6 +245,54 @@ class PipelineCreatorModuleTest(ScriptedLoadableModuleTest):
     output = logic.runPipeline(pipeline, inputNode)
     self.assertIsInstance(output, slicer.vtkMRMLModelNode)
     self.assertIsNotNone(output.GetMesh())
+
+  def test_PipelineCreatorLogic_expectedFailToCreatePipeline(self):
+    logic = self.createTesterPipelineCreator()
+
+    validName = "Pipeline1_hopefully_no_module_is_ever_created_with_this_name"
+    validPipeline = [
+      ("TestPipeline1", {}),
+      ("TestPipeline2", {"HasMesh": True}),
+    ]
+
+    invalidPipelines = [
+      [], # empty pipeline
+      [ # invalid matchup of input and output types
+        ("TestPipeline1", {}),
+        (("TestPipeline3", {}),)
+      ],
+    ]
+    invalidNames = keyword.kwlist + [x.upper() for x in keyword.kwlist if x.lower() == x] + [
+      "", # invalid python identifier
+      "1abc", # invalid python identifier
+      "abcd-1", # invalid python identifier
+      "abcd 2", # invalid python identifier
+
+      "pipelinecreator", # already existing module (need to use thing guaranteed to exist)
+      "PipelineCreator", # already existing module (need to use thing guaranteed to exist)
+      "pipelineCASEiterator", # already existing module (need to use thing guaranteed to exist)
+    ]
+
+
+    for pipeline in invalidPipelines:
+      with tempfile.TemporaryDirectory(dir=slicer.app.temporaryPath) as pipelineDir:
+        self.assertRaises(Exception, lambda: logic.createPipeline(validName, pipelineDir, pipeline))
+    for name in invalidNames:
+      with tempfile.TemporaryDirectory(dir=slicer.app.temporaryPath) as pipelineDir:
+        self.assertRaises(Exception, lambda: logic.createPipeline(name, pipelineDir, validPipeline))
+
+    #test non empty directory
+    with tempfile.TemporaryDirectory(dir=slicer.app.temporaryPath) as pipelineDir:
+      with open(os.path.join(pipelineDir, "file"), 'w') as _:
+        pass
+      self.assertRaises(Exception, lambda: logic.createPipeline(validName, pipelineDir, validPipeline))
+
+    with tempfile.TemporaryDirectory(dir=slicer.app.temporaryPath) as pipelineDir:
+      self.assertRaises(Exception, lambda: logic.createPipeline(validName, pipelineDir, None))
+    with tempfile.TemporaryDirectory(dir=slicer.app.temporaryPath) as pipelineDir:
+      self.assertRaises(Exception, lambda: logic.createPipeline(validName, None, validPipeline))
+    with tempfile.TemporaryDirectory(dir=slicer.app.temporaryPath) as pipelineDir:
+      self.assertRaises(Exception, lambda: logic.createPipeline(validName, '', validPipeline))
 
   def test_PipelineCreatorLogic_createPipeline1(self):
     for doMesh in (True, False):
