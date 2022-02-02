@@ -4,12 +4,12 @@ project(Pipelines)
 
 #-----------------------------------------------------------------------------
 # Extension meta-information
-set(EXTENSION_HOMEPAGE "https://www.slicer.org/wiki/Documentation/Nightly/Extensions/Pipelines")
+set(EXTENSION_HOMEPAGE "https://github.com/KitwareMedical/SlicerPipelines/wiki")
 set(EXTENSION_CATEGORY "Pipelines")
 set(EXTENSION_CONTRIBUTORS "Connor Bowley (Kitware, Inc.)")
-set(EXTENSION_DESCRIPTION "This extension is used for creating Pipelines")
+set(EXTENSION_DESCRIPTION "SlicerPipelines is an extension for 3DSlicer that offers the ability to create simple modules (aka pipelines) via a GUI interface with no coding knowledge needed")
 set(EXTENSION_ICONURL "http://www.example.com/Slicer/Extensions/Pipelines.png")
-set(EXTENSION_SCREENSHOTURLS "http://www.example.com/Slicer/Extensions/Pipelines/Screenshots/1.png")
+set(EXTENSION_SCREENSHOTURLS "https://raw.githubusercontent.com/KitwareMedical/SlicerPipelines/main/Screenshots/1.png https://raw.githubusercontent.com/KitwareMedical/SlicerPipelines/main/Screenshots/2.png")
 set(EXTENSION_DEPENDS "NA") # Specified as a list or "NA" if no dependencies
 
 #-----------------------------------------------------------------------------
