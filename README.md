@@ -3,6 +3,9 @@ SlicerPipelines
 
 SlicerPipelines is an extension for 3D Slicer for creating and executing simple modules (aka pipelines) via a GUI interface with no coding knowledge needed.
 
+<p align="center">
+  <img src="Pipelines.png" alt="SlicerPipelines Logo"/>
+</p>
 
 ## Overview
 
