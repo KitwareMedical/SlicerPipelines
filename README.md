@@ -11,5 +11,5 @@ In general, the SlicerPipelines extension is meant to help improve efficiency wh
 SlicerPipelines is a Slicer extension made for SlicerSALT. To learn more about Slicer, SlicerSALT, and Slicer extensions, check out the following resources.
 
  - https://slicer.readthedocs.io/en/latest/
- - http://salt.slicer.org/
+ - https://salt.slicer.org/
  - https://slicer.readthedocs.io/en/latest/user_guide/extensions_manager.html
