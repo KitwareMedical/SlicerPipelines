@@ -21,3 +21,7 @@ SlicerPipelines is a Slicer extension made for SlicerSALT. To learn more about S
  - https://salt.slicer.org/
  - https://slicer.readthedocs.io/en/latest/user_guide/extensions_manager.html
 
+## License
+
+This software is licensed under the terms of the [Apache Licence Version 2.0](LICENSE).
+
