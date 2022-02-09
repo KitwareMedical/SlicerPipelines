@@ -34,6 +34,11 @@ _:warning: This extension is under active development. Its content, API and beha
 |--|--|
 | <sub>_PipelineCreator depicting a pipelines composed of three `SegmentEditor` steps `Thresholding`, `Smoothing` and `Island`._</sub> | <sub>_Popup dialog for adding a pipeline step in the PipelineCreator module._</sub> |
 
+| ![PipelineCaseIterator - overview](Screenshots/3.png) |
+|--|
+| <sub>_`PipelineCaseIterator` showing the progress toward the execution of a pipeline over 27 cases._</sub> |
+
+
 ## Resources
 
 To learn more about Slicer, SlicerSALT, and Slicer extensions, check out the following resources.
