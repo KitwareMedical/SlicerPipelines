@@ -30,8 +30,9 @@ _:warning: This extension is under active development. Its content, API and beha
 
 ## Screenshots
 
-![PipelineCreator module](Screenshots/1.png)
-![Select Module pop up](Screenshots/2.png)
+| ![PipelineCreator - overview](Screenshots/1.png) | ![PipelineCreator - step adding step](Screenshots/2.png) |
+|--|--|
+| <sub>_PipelineCreator depicting a pipelines composed of three `SegmentEditor` steps `Thresholding`, `Smoothing` and `Island`._</sub> | <sub>_Popup dialog for adding a pipeline step in the PipelineCreator module._</sub> |
 
 ## Resources
 
