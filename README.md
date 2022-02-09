@@ -1,12 +1,21 @@
 SlicerPipelines
 ---------------
 
-SlicerPipelines is an extension for 3D Slicer that offers the ability to create simple modules (aka pipelines) via a GUI interface with no coding knowledge needed.
+SlicerPipelines is an extension for 3D Slicer for creating and executing simple modules (aka pipelines) via a GUI interface with no coding knowledge needed.
 
 
 ## Overview
 
-In general, the SlicerPipelines extension is meant to help improve efficiency when dealing with simple workflows. Two main modules currently exist, a PipelineCreator module that allows for the creation of pipelines, and a PipelineCaseIterator module that allows for automated running of a pipeline over all files in a directory.
+The SlicerPipelines extension allows to create and execute simple linear workflows using the `PipelineCreator` and the `PipelineCaseIterator` modules.
+
+The design and implementation of this extension was initially motivated to simplify the creation of shape analysis workflow specific to the SlicerSALT community.
+
+## Features
+
+* **Simple**: Create and execute pipelines with a few clicks.
+* **Composable**: Pipelines are themselve modules available as "steps" to create new pipelines.
+* **Extensible**: Regular Slicer module modules, python functions, or executable can be registered as pipeline steps.
+
 
 ## Screenshots
 
@@ -15,7 +24,7 @@ In general, the SlicerPipelines extension is meant to help improve efficiency wh
 
 ## Resources
 
-SlicerPipelines is a Slicer extension made for SlicerSALT. To learn more about Slicer, SlicerSALT, and Slicer extensions, check out the following resources.
+To learn more about Slicer, SlicerSALT, and Slicer extensions, check out the following resources.
 
  - https://slicer.readthedocs.io/en/latest/
  - https://salt.slicer.org/
