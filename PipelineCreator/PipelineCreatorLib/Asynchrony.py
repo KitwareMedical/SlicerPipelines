@@ -6,7 +6,7 @@ import qt
 class Asynchrony(object):
   '''
   This class allows for functions to be run in other threads. It's unique contribution to the plethora
-  of threading libraries around is it is designed to work with 3DSlicer's use of Qt and its event loop.
+  of threading libraries around is it is designed to work with 3D Slicer's use of Qt and its event loop.
 
   This class takes care of causing the main Qt event loop thread to yield the Python GIL allowing the
   newly spawned thread to run. It is the job of the function being run to yield control enough to allow
