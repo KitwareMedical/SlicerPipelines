@@ -16,7 +16,7 @@ The design and implementation of this extension was initially motivated to simpl
 ## Features
 
 * **Simple**: Create and execute pipelines with a few clicks.
-* **Composable**: Pipelines are themselve modules available as "steps" to create new pipelines.
+* **Composable**: Pipelines are themselves modules available as "steps" to create new pipelines.
 * **Extensible**: Regular Slicer module modules, python functions, or executable can be registered as pipeline steps.
 
 ## Modules
@@ -28,7 +28,8 @@ The design and implementation of this extension was initially motivated to simpl
 | [PipelineModules](PipelineModules) | Support the registration of "wrappers" providing the steps used in the creation of pipelines by the `PipelineCreator` module. |
 | [PipelineCLIBridge](PipelineCLIBridge) | Bridge the gap between the CLI C++ interface and the Python code of the `PipelineCreator`. |
 
-_:warning: This extension is under active development. Its content, API and behavior may change at any time. Additionally, you should consider the `PipelineModules` and `PipelineCLIBridge` modules as implementation details and not depends on there API. We mean it !_
+_:warning: This extension is under active development. Its content, API and behavior may change at any time. We mean it!_
+
 
 ## Tutorials
 
