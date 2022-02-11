@@ -135,7 +135,7 @@ class PipelineCaseIterator(ScriptedLoadableModule):
     self.parent.helpText = """
 This module allows running a pipeline over multiple files in a directory and output the results in another directory.
 """
-    self.parent.acknowledgementText = ""
+    self.parent.acknowledgementText = "This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT."
 
 #
 # PipelineCaseIteratorWidget

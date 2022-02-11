@@ -41,7 +41,7 @@ class PipelineModules(ScriptedLoadableModule):
     self.parent.helpText = """
 This module exists to create pipelines for the PipelineCreator to use.
 """
-    self.parent.acknowledgementText = ""
+    self.parent.acknowledgementText = "This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT."
     self.parent.hidden = True
 
 #

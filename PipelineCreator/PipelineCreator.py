@@ -57,9 +57,7 @@ class PipelineCreator(ScriptedLoadableModule):
 This is module offers the ability to create simple modules (aka pipelines) via a GUI interface with no coding knowledge needed
 See more information in <a href="https://github.com/KitwareMedical/SlicerPipelines/blob/main/README.md">module documentation</a>.
 """
-    self.parent.acknowledgementText = """
-This module was originally developed by Connor Bowley, Kitware Inc.
-"""
+    self.parent.acknowledgementText = "This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT."
 
   def createLogic(self):
     return PipelineCreatorLogic()
