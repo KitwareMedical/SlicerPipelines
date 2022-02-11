@@ -63,7 +63,7 @@ QString qSlicerPipelineCLIBridgeModule::helpText() const
 //-----------------------------------------------------------------------------
 QString qSlicerPipelineCLIBridgeModule::acknowledgementText() const
 {
-  return "";
+  return "This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT.";
 }
 
 //-----------------------------------------------------------------------------

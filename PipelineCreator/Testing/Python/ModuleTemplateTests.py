@@ -1,6 +1,6 @@
 import unittest
 
-from _PipelineCreator.TemplateModule.ModuleTemplate import ModuleTemplate
+from PipelineCreatorLib._Private.ModuleTemplate import ModuleTemplate
 
 class TestModuleTemplate(unittest.TestCase):
   def test_simple(self):
