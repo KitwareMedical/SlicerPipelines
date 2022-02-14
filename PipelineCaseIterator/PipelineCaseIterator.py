@@ -381,7 +381,6 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
 
     cmd = [
       launcherPath,
-      '--no-main-window',
       '--python-script',
       scriptPath,
       '--',
