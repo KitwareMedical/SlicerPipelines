@@ -229,14 +229,14 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       slicer.mrmlScene.RemoveNode(actualOutputNode)
 
     except Exception as e:
-      if self._runPipelineProgressDialog is not None:
-        self._runPipelineProgressDialog.close()
-        self._runPipelineProgressDialog = None
-
       msgbox = qt.QMessageBox()
       msgbox.setWindowTitle("Error running pipeline")
       msgbox.setText(str(e) + '\n\n' + "".join(traceback.TracebackException.from_exception(e).format()))
       msgbox.exec()
+    finally:
+      if self._runPipelineProgressDialog is not None:
+        self._runPipelineProgressDialog.close()
+        self._runPipelineProgressDialog = None
 
   def _modulesChanged(self):
     #update overall input/output
