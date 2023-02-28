@@ -63,7 +63,7 @@ def mirrorMesh(mesh: vtkMRMLModelNode,
                mirrorY: bool,
                mirrorZ: bool) -> vtkMRMLModelNode:
     return _surfaceToolboxRun(mesh, "mirror", {
-        "mirrorX": str(mirrorX),
-        "mirrorY": str(mirrorY),
-        "mirrorZ": str(mirrorZ),
+        "mirrorX": "true" if mirrorX else "false",
+        "mirrorY": "true" if mirrorY else "false",
+        "mirrorZ": "true" if mirrorZ else "false",
     })
