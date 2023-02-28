@@ -117,11 +117,11 @@ class {name}ParameterNode:
 #
 
 class {name}Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
-{tab}def __init__(self, parent):
-{tab}{tab}ScriptedLoadableModuleWidget.__init__(self, parent)
+{tab}def __init__(self, parent=None):
 {tab}{tab}self.logic = None
 {tab}{tab}self._parameterNode = None
 {tab}{tab}self._parameterNodeGuiTag = None
+{tab}{tab}ScriptedLoadableModuleWidget.__init__(self, parent)
 
 {tab}def setup(self):
 {tab}{tab}ScriptedLoadableModuleWidget.setup(self)

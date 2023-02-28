@@ -1,6 +1,8 @@
+import importlib
 import os
 import pathlib
-import typing
+import shutil
+import sys
 from typing import Annotated, Optional
 
 try:
@@ -23,7 +25,6 @@ from slicer.parameterNodeWrapper import (
 
 from _PipelineCreatorMk2.PipelineRegistrar import PipelineRegistrar, PipelineInfo
 from _PipelineCreatorMk2 import PipelineCreation
-from _PipelineCreatorMk2.PipelineCreation.util import printPipeline
 
 from Widgets.PipelineListWidget import PipelineListWidget
 from Widgets.SelectPipelinePopUp import SelectPipelinePopUp
@@ -111,6 +112,7 @@ class PipelineCreatorMk2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin
         self.logic = None
         self._parameterNode = None
         self._parameterNodeGuiTag = None
+        self._testNum = 0
 
     def setup(self) -> None:
         """
@@ -141,6 +143,7 @@ class PipelineCreatorMk2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin
 
         # Connections
         self.ui.GeneratePipelineButton.clicked.connect(self.onGeneratePipeline)
+        self.ui.TestPipelineButton.clicked.connect(self.onTestPipeline)
 
         # These connections ensure that we update parameter node when scene is closed
         self.addObserver(
@@ -211,39 +214,95 @@ class PipelineCreatorMk2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin
             # ui element that needs connection.
             self._parameterNodeGuiTag = self._parameterNode.connectGui(self.ui)
 
+    def onTestPipeline(self):
+        """
+        To test the pipeline, we generate it, load it halfway into the python and slicer module infrastructures
+        (but not all the way), and then use it.
+        """
+
+        class FakeSlicerModule:
+            def __init__(self, path):
+                self.path = path
+
+        tempDir = os.path.join(slicer.app.temporaryPath, f"TestPipeline-{id(self)}-{self._testNum}")
+        filepath = os.path.join(tempDir, f"{self._parameterNode.pipelineName}.py")
+        self._testNum += 1
+        self._generatePipeline(tempDir, popUpOnSuccess=False)
+
+        # load it as a Python module
+        spec = importlib.util.spec_from_file_location(self._parameterNode.pipelineName, filepath)
+        pipelineModule = importlib.util.module_from_spec(spec)
+        # needs to exist in sys.modules for some of the parameterPack stuff to work
+        sys.modules[self._parameterNode.pipelineName] = pipelineModule
+        # fake load it into the slicer infrastructure
+        setattr(slicer.modules, self._parameterNode.pipelineName.lower(), FakeSlicerModule(tempDir))
+        spec.loader.exec_module(pipelineModule)
+
+        pipelineWidget = getattr(pipelineModule, f"{self._parameterNode.pipelineName}Widget")()
+
+        def onBack():
+            # when we leave the testing, move clean up after ourselves
+            self.ui.StackedWidget.setCurrentIndex(0)
+            self.ui.StackedWidget.removeWidget(widget)
+            shutil.rmtree(tempDir)
+            sys.modules.pop(self._parameterNode.pipelineName)
+            delattr(slicer.modules, self._parameterNode.pipelineName.lower())
+            # need to completely clear up the underlying parameter node in case we retest with the same widget.
+            pipelineWidget.exit()
+            pipelineWidget._parameterNode.parameterNode.RemoveAllObservers()
+            pipelineWidget._parameterNode.parameterNode.UnsetAllParameters()
+
+        backButton = qt.QPushButton("Back")
+        backButton.sizePolicy = qt.QSizePolicy(qt.QSizePolicy.Fixed, qt.QSizePolicy.Fixed)
+        backButton.clicked.connect(onBack)
+
+        widget = qt.QWidget()
+        widget.setLayout(qt.QVBoxLayout())
+        widget.layout().addWidget(backButton)
+        widget.layout().addWidget(pipelineWidget.parent)
+
+        index = self.ui.StackedWidget.addWidget(widget)
+        self.ui.StackedWidget.setCurrentIndex(index)
+
     def onGeneratePipeline(self):
+        self._generatePipeline(self._parameterNode.outputDirectory)
+
+        # this only runs if the generation didn't throw
+        pipelineName = self._parameterNode.pipelineName
+        outputDirectory = self._parameterNode.outputDirectory
+        if self._parameterNode.loadModuleOnCreation:
+                factory = slicer.app.moduleManager().factoryManager()
+                factory.registerModule(qt.QFileInfo(os.path.join(outputDirectory, pipelineName + ".py")))
+                factory.loadModules([pipelineName])
+
+        if self._parameterNode.addToAdditionalModulePaths:
+            settings = slicer.app.revisionUserSettings()
+
+            rawSearchPaths = settings.value("Modules/AdditionalPaths") or []
+            if isinstance(rawSearchPaths, str):
+                rawSearchPaths = [rawSearchPaths]
+            if not isinstance(rawSearchPaths, list):
+                # if it returns a tuple or other iterable, make it a list
+                rawSearchPaths = list(rawSearchPaths)
+
+            if outputDirectory not in [qt.QDir(rawPath) for rawPath in rawSearchPaths]:
+                rawSearchPaths.append(str(outputDirectory))
+                settings.setValue("Modules/AdditionalPaths", rawSearchPaths)
+
+    def _generatePipeline(self, outputDirectory, popUpOnSuccess=True):
         try:
             pipelineName = self._parameterNode.pipelineName
-            outputDirectory = self._parameterNode.outputDirectory
             self.logic.createPipeline(
                 pipelineName,
                 outputDirectory,
                 self.ui.PipelineListWidget.computePipeline(),
                 self._parameterNode.icon)
 
-            if self._parameterNode.loadModuleOnCreation:
-                factory = slicer.app.moduleManager().factoryManager()
-                factory.registerModule(qt.QFileInfo(os.path.join(outputDirectory, pipelineName + ".py")))
-                factory.loadModules([pipelineName])
-
-            if self._parameterNode.addToAdditionalModulePaths:
-                settings = slicer.app.revisionUserSettings()
-
-                rawSearchPaths = settings.value("Modules/AdditionalPaths") or []
-                if isinstance(rawSearchPaths, str):
-                    rawSearchPaths = [rawSearchPaths]
-                if not isinstance(rawSearchPaths, list):
-                    # if it returns a tuple or other iterable, make it a list
-                    rawSearchPaths = list(rawSearchPaths)
-
-                if outputDirectory not in [qt.QDir(rawPath) for rawPath in rawSearchPaths]:
-                    rawSearchPaths.append(str(outputDirectory))
-                    settings.setValue("Modules/AdditionalPaths", rawSearchPaths)
-
-            msgbox = qt.QMessageBox()
-            msgbox.setWindowTitle("SUCCESS")
-            msgbox.setText(f"Successfully created Pipeline '{pipelineName}' at '{outputDirectory}'!")
-            msgbox.exec()
+            if popUpOnSuccess:
+                msgbox = qt.QMessageBox()
+                msgbox.setWindowTitle("SUCCESS")
+                msgbox.setText(f"Successfully created Pipeline '{pipelineName}' at '{outputDirectory}'!")
+                msgbox.exec()
         except Exception as e:
             msgbox = qt.QMessageBox()
             msgbox.setWindowTitle("ERROR")
