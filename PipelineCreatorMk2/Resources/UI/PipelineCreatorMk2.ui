@@ -44,6 +44,32 @@
     </layout>
    </item>
    <item>
+    <widget class="QCheckBox" name="LoadModuleOnCreationCheckBox">
+     <property name="text">
+      <string>Load module on creation</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+     <property name="SlicerParameterName" stdset="0">
+      <string>loadModuleOnCreation</string>
+     </property>
+    </widget>
+   </item>
+   <item>
+    <widget class="QCheckBox" name="AddToAdditionalModulePathCheckBox">
+     <property name="text">
+      <string>Add to additional module paths</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+     <property name="SlicerParameterName" stdset="0">
+      <string>addToAdditionalModulePaths</string>
+     </property>
+    </widget>
+   </item>
+   <item>
     <widget class="QPushButton" name="GeneratePipelineButton">
      <property name="text">
       <string>Generate Pipeline</string>

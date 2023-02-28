@@ -88,6 +88,8 @@ class PipelineCreatorMk2ParameterNode:
     pipelineName: str
     outputDirectory: pathlib.Path
     icon: Annotated[pathlib.Path, Default(generator=_defaultIcon)]
+    loadModuleOnCreation: Annotated[bool, Default(True)]
+    addToAdditionalModulePaths: Annotated[bool, Default(True)]
 
 
 #
@@ -211,14 +213,36 @@ class PipelineCreatorMk2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin
 
     def onGeneratePipeline(self):
         try:
+            pipelineName = self._parameterNode.pipelineName
+            outputDirectory = self._parameterNode.outputDirectory
             self.logic.createPipeline(
-                self._parameterNode.pipelineName,
-                self._parameterNode.outputDirectory,
+                pipelineName,
+                outputDirectory,
                 self.ui.PipelineListWidget.computePipeline(),
                 self._parameterNode.icon)
+
+            if self._parameterNode.loadModuleOnCreation:
+                factory = slicer.app.moduleManager().factoryManager()
+                factory.registerModule(qt.QFileInfo(os.path.join(outputDirectory, pipelineName + ".py")))
+                factory.loadModules([pipelineName])
+
+            if self._parameterNode.addToAdditionalModulePaths:
+                settings = slicer.app.revisionUserSettings()
+
+                rawSearchPaths = settings.value("Modules/AdditionalPaths") or []
+                if isinstance(rawSearchPaths, str):
+                    rawSearchPaths = [rawSearchPaths]
+                if not isinstance(rawSearchPaths, list):
+                    # if it returns a tuple or other iterable, make it a list
+                    rawSearchPaths = list(rawSearchPaths)
+
+                if outputDirectory not in [qt.QDir(rawPath) for rawPath in rawSearchPaths]:
+                    rawSearchPaths.append(str(outputDirectory))
+                    settings.setValue("Modules/AdditionalPaths", rawSearchPaths)
+
             msgbox = qt.QMessageBox()
             msgbox.setWindowTitle("SUCCESS")
-            msgbox.setText(f"Successfully created Pipeline '{self._parameterNode.pipelineName}' at '{self._parameterNode.outputDirectory}'!")
+            msgbox.setText(f"Successfully created Pipeline '{pipelineName}' at '{outputDirectory}'!")
             msgbox.exec()
         except Exception as e:
             msgbox = qt.QMessageBox()
