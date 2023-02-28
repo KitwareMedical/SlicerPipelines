@@ -12,86 +12,102 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
-    <layout class="QFormLayout" name="formLayout">
-     <item row="0" column="0">
-      <widget class="QLabel" name="label">
-       <property name="text">
-        <string>Pipeline name</string>
-       </property>
-      </widget>
-     </item>
-     <item row="0" column="1">
-      <widget class="QLineEdit" name="lineEdit">
-       <property name="SlicerParameterName" stdset="0">
-        <string>pipelineName</string>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="0">
-      <widget class="QLabel" name="label_2">
-       <property name="text">
-        <string>Output directory</string>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="1">
-      <widget class="ctkDirectoryButton" name="DirectoryButton">
-       <property name="SlicerParameterName" stdset="0">
-        <string>outputDirectory</string>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </item>
-   <item>
-    <widget class="QCheckBox" name="LoadModuleOnCreationCheckBox">
-     <property name="text">
-      <string>Load module on creation</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-     <property name="SlicerParameterName" stdset="0">
-      <string>loadModuleOnCreation</string>
-     </property>
+    <widget class="QStackedWidget" name="StackedWidget">
+     <widget class="QWidget" name="page">
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <layout class="QFormLayout" name="formLayout">
+         <item row="0" column="0">
+          <widget class="QLabel" name="label">
+           <property name="text">
+            <string>Pipeline name</string>
+           </property>
+          </widget>
+         </item>
+         <item row="0" column="1">
+          <widget class="QLineEdit" name="lineEdit">
+           <property name="SlicerParameterName" stdset="0">
+            <string>pipelineName</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="0">
+          <widget class="QLabel" name="label_2">
+           <property name="text">
+            <string>Output directory</string>
+           </property>
+          </widget>
+         </item>
+         <item row="1" column="1">
+          <widget class="ctkDirectoryButton" name="DirectoryButton">
+           <property name="SlicerParameterName" stdset="0">
+            <string>outputDirectory</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="LoadModuleOnCreationCheckBox">
+         <property name="text">
+          <string>Load module on creation</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+         <property name="SlicerParameterName" stdset="0">
+          <string>loadModuleOnCreation</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="AddToAdditionalModulePathCheckBox">
+         <property name="text">
+          <string>Add to additional module paths</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+         <property name="SlicerParameterName" stdset="0">
+          <string>addToAdditionalModulePaths</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="TestPipelineButton">
+         <property name="text">
+          <string>Test Pipeline</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="GeneratePipelineButton">
+         <property name="text">
+          <string>Generate Pipeline</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="Line" name="line_2">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="Line" name="line">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="StepsContainerWidget" native="true"/>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="page_2"/>
     </widget>
-   </item>
-   <item>
-    <widget class="QCheckBox" name="AddToAdditionalModulePathCheckBox">
-     <property name="text">
-      <string>Add to additional module paths</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-     <property name="SlicerParameterName" stdset="0">
-      <string>addToAdditionalModulePaths</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QPushButton" name="GeneratePipelineButton">
-     <property name="text">
-      <string>Generate Pipeline</string>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="Line" name="line_2">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="Line" name="line">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item>
-    <widget class="QWidget" name="StepsContainerWidget" native="true"/>
    </item>
    <item>
     <spacer name="verticalSpacer">
