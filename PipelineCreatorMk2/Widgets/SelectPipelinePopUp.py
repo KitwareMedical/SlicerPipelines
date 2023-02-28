@@ -28,14 +28,23 @@ class SelectPipelinePopUp(qt.QDialog):
         for pipelineName in self._registeredPipelines.keys():
             self.ui.PipelineList.addItem(pipelineName)
 
-        # delete start
-        self.ui.PipelineList.setDragDropMode(qt.QAbstractItemView.InternalMove)
-        # delete end
-
         self.ui.PipelineList.currentItemChanged.connect(self._updateOutput)
 
         # double click same as accept
         self.ui.PipelineList.itemDoubleClicked.connect(self._updateAndAccept)
+
+        categories = sorted(list(set(c for info in registeredPipelines.values() for c in info.categories)))
+        self.ui.CategoryComboBox.addItem("All")
+        for category in categories:
+            self.ui.CategoryComboBox.addItem(category)
+        self.ui.CategoryComboBox.currentIndexChanged.connect(self._filterByCategory)
+
+    def _filterByCategory(self):
+        self.ui.PipelineList.clear()
+        for pipelineName, info in self._registeredPipelines.items():
+            if self.ui.CategoryComboBox.currentText == "All" or self.ui.CategoryComboBox.currentText in info.categories:
+                self.ui.PipelineList.addItem(pipelineName)
+
 
     def _updateOutput(self):
         listItem = self.ui.PipelineList.currentItem()
