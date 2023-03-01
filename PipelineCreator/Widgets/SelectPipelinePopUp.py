@@ -25,6 +25,8 @@ class SelectPipelinePopUp(qt.QDialog):
         self.ui.ButtonBox.accepted.connect(self.accept)
         self.ui.ButtonBox.rejected.connect(self.reject)
 
+        self.ui.ButtonBox.button(qt.QDialogButtonBox.Ok).enabled = False
+
         for pipelineName in self._registeredPipelines.keys():
             self.ui.PipelineList.addItem(pipelineName)
 
@@ -47,6 +49,7 @@ class SelectPipelinePopUp(qt.QDialog):
 
 
     def _updateOutput(self):
+        self.ui.ButtonBox.button(qt.QDialogButtonBox.Ok).enabled = self.ui.PipelineList.currentIndex >= 0
         listItem = self.ui.PipelineList.currentItem()
         self.ui.ButtonBox.button(self.ui.ButtonBox.Ok).enabled = bool(listItem)
         if listItem:
