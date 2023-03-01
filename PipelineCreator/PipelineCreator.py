@@ -20,14 +20,13 @@ from slicer.util import VTKObservationMixin
 from slicer.parameterNodeWrapper import (
     Default,
     parameterNodeWrapper,
-    parameterPack,
 )
 
 from _PipelineCreator.PipelineRegistrar import PipelineRegistrar, PipelineInfo
 from _PipelineCreator import PipelineCreation
 
 from Widgets.PipelineListWidget import PipelineListWidget
-from Widgets.SelectPipelinePopUp import SelectPipelinePopUp
+from Widgets.PipelineProgressBar import PipelineProgressCallback, isPipelineProgressCallback
 
 __all__ = [
     "PipelineRegistrar", # repackage to public because PipelineListWidget uses it
@@ -36,6 +35,9 @@ __all__ = [
     "PipelineCreatorLogic",
     "singletonRegisterPipelineFunction",
     "slicerPipeline",
+
+    "isPipelineProgressCallback",
+    "PipelineProgressCallback",
 ]
 
 
@@ -51,7 +53,7 @@ class PipelineCreator(ScriptedLoadableModule):
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
         # TODO: make this more human readable by adding spaces
-        self.parent.title = "PipelineCreator"
+        self.parent.title = "Pipeline Creator"
         self.parent.categories = ["Pipelines"]
         self.parent.dependencies = []
         self.parent.contributors = ["Connor Bowley (Kitware, Inc.)"]
@@ -226,6 +228,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
         tempDir = os.path.join(slicer.app.temporaryPath, f"TestPipeline-{id(self)}-{self._testNum}")
         filepath = os.path.join(tempDir, f"{self._parameterNode.pipelineName}.py")
+        print(f"Temporary pipeline at {filepath}")
         self._testNum += 1
         self._generatePipeline(tempDir, popUpOnSuccess=False)
 

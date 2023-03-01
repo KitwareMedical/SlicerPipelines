@@ -58,7 +58,8 @@ def _createOnRunFunction(logicRunMethodName: str, pipeline: nx.DiGraph, tab: str
     code = f'''
 def _onRun(self):
 {tab}{", ".join(outputNames)} = self.logic.{logicRunMethodName}(
-{argsCode})
+{argsCode},
+progress_callback=self.progressBar.getProgressCallback())
 
 {textwrap.indent(outputFillCode, tab)}
 
@@ -85,6 +86,7 @@ def createWidget(name: str,
     imports += "from slicer.util import VTKObservationMixin\n"
     imports += "from slicer.parameterNodeWrapper import createGui\n"
     imports += "from slicer.parameterNodeWrapper import parameterNodeWrapper\n"
+    imports += "from Widgets.PipelineProgressBar import PipelineProgressBar\n"
 
     # code
     code = f'''
@@ -129,9 +131,11 @@ class {name}Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 {tab}{tab}self.paramWidget = createGui({name}ParameterNode)
 {tab}{tab}self.paramWidget.setMRMLScene(slicer.mrmlScene)
 {tab}{tab}self.runButton = qt.QPushButton("Run")
+{tab}{tab}self.progressBar = PipelineProgressBar()
 
 {tab}{tab}self.layout.addWidget(self.paramWidget)
 {tab}{tab}self.layout.addWidget(self.runButton)
+{tab}{tab}self.layout.addWidget(self.progressBar)
 {tab}{tab}self.layout.addStretch()
 
 {tab}{tab}# These connections ensure that we update parameter node when scene is closed

@@ -20,6 +20,7 @@ set(MODULE_PYTHON_SCRIPTS
   _${MODULE_NAME}/PipelineCreation/CodeGeneration/widget.py
 
   Widgets/PipelineListWidget.py
+  Widgets/PipelineProgressBar.py
   Widgets/SelectPipelinePopUp.py
   )
 
