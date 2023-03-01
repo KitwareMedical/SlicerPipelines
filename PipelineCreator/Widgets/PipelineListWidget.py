@@ -20,7 +20,7 @@ from slicer.parameterNodeWrapper import (
     Default,
 )
 
-from _PipelineCreatorMk2.PipelineRegistrar import PipelineRegistrar, PipelineInfo
+from _PipelineCreator.PipelineRegistrar import PipelineRegistrar, PipelineInfo
 
 
 __all__ = ["PipelineListWidget"]

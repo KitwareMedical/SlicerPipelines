@@ -7,8 +7,8 @@ import networkx as nx
 
 import slicer
 
-from _PipelineCreatorMk2.PipelineRegistrar import PipelineInfo
-from _PipelineCreatorMk2.PipelineCreation import CodeGeneration
+from _PipelineCreator.PipelineRegistrar import PipelineInfo
+from _PipelineCreator.PipelineCreation import CodeGeneration
 
 from .validation import validatePipeline
 
@@ -27,10 +27,10 @@ def _createPythonFileCode(name: str,
         name=name,
         title=name,
         categories=["PipelineModules"],
-        dependencies=["PipelineCreatorMk2"],
-        contributors=["Connor Bowley (Kitware, Inc)", "PipelineCreatorMk2"],
-        helpText="This module was created by the PipelineCreatorMk2.",
-        acknowledgementText="This module was created by the PipelineCreatorMk2.",
+        dependencies=["PipelineCreator"],
+        contributors=["Connor Bowley (Kitware, Inc)", "PipelineCreator"],
+        helpText="This module was created by the PipelineCreator.",
+        acknowledgementText="This module was created by the PipelineCreator.",
         tab=tab)
 
     logic = CodeGeneration.createLogic(

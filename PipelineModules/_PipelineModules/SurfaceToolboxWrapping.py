@@ -6,7 +6,7 @@ from slicer.parameterNodeWrapper import (
 )
 from MRMLCorePython import vtkMRMLModelNode
 
-from PipelineCreatorMk2 import slicerPipelineMk2
+from PipelineCreator import slicerPipeline
 from SurfaceToolbox import SurfaceToolboxLogic
 
 
@@ -32,7 +32,7 @@ def _surfaceToolboxRun(mesh: vtkMRMLModelNode,
         slicer.mrmlScene.RemoveNode(parameterNode)
 
 
-@slicerPipelineMk2(name="SurfaceToolbox.ScaleMesh", dependencies=["SurfaceToolbox"], categories=["SurfaceToolbox", "Model Operations"])
+@slicerPipeline(name="SurfaceToolbox.ScaleMesh", dependencies=["SurfaceToolbox"], categories=["SurfaceToolbox", "Model Operations"])
 def scaleMesh(mesh: vtkMRMLModelNode,
               scaleX: Annotated[float, Minimum(0)],
               scaleY: Annotated[float, Minimum(0)],
@@ -45,7 +45,7 @@ def scaleMesh(mesh: vtkMRMLModelNode,
     })
 
 
-@slicerPipelineMk2(name="SurfaceToolbox.TranslateMesh", dependencies=["SurfaceToolbox"], categories=["SurfaceToolbox", "Model Operations"])
+@slicerPipeline(name="SurfaceToolbox.TranslateMesh", dependencies=["SurfaceToolbox"], categories=["SurfaceToolbox", "Model Operations"])
 def translateMesh(mesh: vtkMRMLModelNode,
                   translateX: float,
                   translateY: float,
@@ -57,7 +57,7 @@ def translateMesh(mesh: vtkMRMLModelNode,
     })
 
 
-@slicerPipelineMk2(name="SurfaceToolbox.Mirror", dependencies=["SurfaceToolbox"], categories=["SurfaceToolbox", "Model Operations"])
+@slicerPipeline(name="SurfaceToolbox.Mirror", dependencies=["SurfaceToolbox"], categories=["SurfaceToolbox", "Model Operations"])
 def mirrorMesh(mesh: vtkMRMLModelNode,
                mirrorX: bool,
                mirrorY: bool,

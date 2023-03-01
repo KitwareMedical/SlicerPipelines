@@ -1,4 +1,4 @@
-from _PipelineCreatorMk2.PipelineCreation.CodeGeneration.util import CodePiece, valueAsCode
+from _PipelineCreator.PipelineCreation.CodeGeneration.util import CodePiece, valueAsCode
 
 def createModule(name: str,
                  title: str,

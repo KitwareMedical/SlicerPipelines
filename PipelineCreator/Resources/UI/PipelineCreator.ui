@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
- <class>PipelineCreatorMk2</class>
- <widget class="qMRMLWidget" name="PipelineCreatorMk2">
+ <class>PipelineCreator</class>
+ <widget class="qMRMLWidget" name="PipelineCreator">
   <property name="geometry">
    <rect>
     <x>0</x>
