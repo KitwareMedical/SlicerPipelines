@@ -2,6 +2,7 @@ from slicer.ScriptedLoadableModule import *
 
 #import all the default wrappings. doing the import will register them with the pipeline creator
 from _PipelineModules import (
+    SegmentationsWrapping,
     SurfaceToolboxWrapping,
 )
 
