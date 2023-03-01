@@ -1,6 +1,6 @@
 import networkx as nx
 
-from _PipelineCreatorMk2.PipelineRegistrar import PipelineInfo
+from _PipelineCreator.PipelineRegistrar import PipelineInfo
 
 from .util import (
     fillInDataTypes,

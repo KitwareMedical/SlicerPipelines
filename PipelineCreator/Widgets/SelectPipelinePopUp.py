@@ -15,7 +15,7 @@ class SelectPipelinePopUp(qt.QDialog):
 
         self._uiWidget = slicer.util.loadUI(
             os.path.join(
-                os.path.dirname(slicer.util.modulePath("PipelineCreatorMk2")),
+                os.path.dirname(slicer.util.modulePath("PipelineCreator")),
                 "Resources",
                 "UI",
                 "SelectPipelinePopUp.ui")

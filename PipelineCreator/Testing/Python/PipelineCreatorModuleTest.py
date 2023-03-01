@@ -21,8 +21,8 @@ from MRMLCorePython import (
     vtkMRMLModelNode,
 )
 
-from PipelineCreatorMk2 import PipelineCreatorMk2Widget, PipelineCreatorMk2Logic
-from _PipelineCreatorMk2 import PipelineCreation
+from PipelineCreator import PipelineCreatorWidget, PipelineCreatorLogic
+from _PipelineCreator import PipelineCreation
 
 
 # note: creates _Python_ module not _slicer_ module
@@ -157,7 +157,7 @@ def funcTestMathPipeline(string: str, additive: int, factor: int) -> int:
 
 class PipelineCreatorUtilTests(unittest.TestCase):
     def test_cleanType(self) -> None:
-        from _PipelineCreatorMk2.PipelineCreation.CodeGeneration.util import typeAsCode
+        from _PipelineCreator.PipelineCreation.CodeGeneration.util import typeAsCode
         self.assertEqual(typeAsCode(int), "int")
         self.assertEqual(typeAsCode(float), "float")
         self.assertEqual(typeAsCode(bool), "bool")
@@ -176,7 +176,7 @@ class PipelineCreatorRegistrationTest(unittest.TestCase):
         slicer.mrmlScene.Clear()
 
     def test_pipeline_function_validation_successes(self):
-        logic = PipelineCreatorMk2Logic(False)
+        logic = PipelineCreatorLogic(False)
 
         def good1(iterations: int, doSomething: bool) -> float:
             pass
@@ -206,7 +206,7 @@ class PipelineCreatorRegistrationTest(unittest.TestCase):
         logic.validatePipelineFunction(StubClass.goodStatic2)
 
     def test_pipeline_function_validation_return_type_errors(self):
-        logic = PipelineCreatorMk2Logic(False)
+        logic = PipelineCreatorLogic(False)
 
         def bad_unannotatedReturnType1():
             pass
@@ -233,7 +233,7 @@ class PipelineCreatorRegistrationTest(unittest.TestCase):
         del bad_noneReturnType2
 
     def test_pipeline_function_validation_parameter_errors(self):
-        logic = PipelineCreatorMk2Logic(False)
+        logic = PipelineCreatorLogic(False)
 
         def bad_unannotatedParameter1(inputMesh) -> vtkMRMLModelNode:
             pass
@@ -271,14 +271,14 @@ class PipelineCreatorRegistrationTest(unittest.TestCase):
         def func2(a: int) -> int:
             return 0
 
-        logic = PipelineCreatorMk2Logic(False)
+        logic = PipelineCreatorLogic(False)
         logic.registerPipeline("func", func1, [])
         with self.assertRaises(RuntimeError):
             logic.registerPipeline("func", func2, [])
 
 
     def test_registration(self):
-        logic = PipelineCreatorMk2Logic(False)
+        logic = PipelineCreatorLogic(False)
 
         self.assertEqual(len(logic.registeredPipelines), 0)
         self.assertFalse(logic.isRegistered("subtraction"))
@@ -314,7 +314,7 @@ class PipelineCreatorRegistrationTest(unittest.TestCase):
 class PipelineCreatorValidationTest(unittest.TestCase):
     def setUp(self) -> None:
         slicer.mrmlScene.Clear()
-        self.logic = PipelineCreatorMk2Logic(False)
+        self.logic = PipelineCreatorLogic(False)
         self.logic.registerPipeline("passthru", passthru, [])
         self.logic.registerPipeline("centerOfX", centerOfX, [])
         self.logic.registerPipeline("decimation", decimation, [])
@@ -408,12 +408,12 @@ class PipelineCreatorValidationTest(unittest.TestCase):
 
 class PipelineCreatorCodeGenModuleTests(unittest.TestCase):
     def test_module(self):
-        from _PipelineCreatorMk2.PipelineCreation.CodeGeneration.module import createModule
+        from _PipelineCreator.PipelineCreation.CodeGeneration.module import createModule
         code = createModule(
             name="TestPipeline",
             title="Test Pipeline",
             categories=["Examples", "Tests"],
-            dependencies=["PipelineCreatorMk2"],
+            dependencies=["PipelineCreator"],
             contributors=["Connor Bowley"],
             helpText="This is a test",
             acknowledgementText="SlicerSALT is great",
@@ -433,7 +433,7 @@ class PipelineCreatorCodeGenModuleTests(unittest.TestCase):
         self.assertEqual(tempPyModule.TestPipeline.__name__, "TestPipeline")
         self.assertEqual(parent.title, "Test Pipeline")
         self.assertEqual(parent.categories, ["Examples", "Tests"])
-        self.assertEqual(parent.dependencies, ["PipelineCreatorMk2"])
+        self.assertEqual(parent.dependencies, ["PipelineCreator"])
         self.assertEqual(parent.contributors, ["Connor Bowley"])
         self.assertEqual(parent.helpText, "This is a test")
         self.assertEqual(parent.acknowledgementText, "SlicerSALT is great")
@@ -441,7 +441,7 @@ class PipelineCreatorCodeGenModuleTests(unittest.TestCase):
 class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
     def setUp(self) -> None:
         slicer.mrmlScene.Clear()
-        self.logic = PipelineCreatorMk2Logic(False)
+        self.logic = PipelineCreatorLogic(False)
         # node pipelines
         self.logic.registerPipeline("passthru", passthru, [])
         self.logic.registerPipeline("centerOfX", centerOfX, [])
@@ -455,7 +455,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
     def test_logic(self):
         pipeline = makeTestMathPipeline(self.logic.registeredPipelines)
 
-        from _PipelineCreatorMk2.PipelineCreation.CodeGeneration.logic import createLogic
+        from _PipelineCreator.PipelineCreation.CodeGeneration.logic import createLogic
         code = createLogic("TestPipelineLogic", pipeline, self.logic.registeredPipelines, tab=" "*4)
         fullCode = "\n".join([code.imports, code.code])
 
@@ -497,7 +497,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
         PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
 
-        from _PipelineCreatorMk2.PipelineCreation.CodeGeneration.logic import createLogic
+        from _PipelineCreator.PipelineCreation.CodeGeneration.logic import createLogic
         code = createLogic("TestPipelineLogicDeleteIntermediates", pipeline, self.logic.registeredPipelines, tab=" "*4)
         fullCode = "\n".join([code.imports, code.code])
 
@@ -515,7 +515,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
 class PipelineCreatorFullTests(unittest.TestCase):
     def setUp(self) -> None:
         slicer.mrmlScene.Clear()
-        self.logic = PipelineCreatorMk2Logic(False)
+        self.logic = PipelineCreatorLogic(False)
         # node pipelines
         self.logic.registerPipeline("passthru", passthru, [])
         self.logic.registerPipeline("centerOfX", centerOfX, [])
@@ -631,7 +631,7 @@ class PipelineCreatorFullTests(unittest.TestCase):
 
     def test_the_whole_shebang(self):
         slicer.mrmlScene.Clear()
-        self.logic = PipelineCreatorMk2Logic(False)
+        self.logic = PipelineCreatorLogic(False)
         self.logic.registerPipeline("passthru", passthru, [])
         self.logic.registerPipeline("centerOfX", centerOfX, [])
         self.logic.registerPipeline("decimation", decimation, [])

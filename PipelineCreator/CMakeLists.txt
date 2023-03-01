@@ -1,16 +1,33 @@
 #-----------------------------------------------------------------------------
-set(MODULE_NAME PipelineModulesMk2)
+set(MODULE_NAME PipelineCreator)
 
 #-----------------------------------------------------------------------------
 set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
 
-  _${MODULE_NAME}/SurfaceToolboxWrapping.py
+  _${MODULE_NAME}/PipelineRegistrar.py
+
+  _${MODULE_NAME}/PipelineCreation/__init__.py
+  _${MODULE_NAME}/PipelineCreation/core.py
+  _${MODULE_NAME}/PipelineCreation/util.py
+  _${MODULE_NAME}/PipelineCreation/validation.py
+
+  _${MODULE_NAME}/PipelineCreation/CodeGeneration/__init__.py
+  _${MODULE_NAME}/PipelineCreation/CodeGeneration/cmakelists.py
+  _${MODULE_NAME}/PipelineCreation/CodeGeneration/logic.py
+  _${MODULE_NAME}/PipelineCreation/CodeGeneration/module.py
+  _${MODULE_NAME}/PipelineCreation/CodeGeneration/util.py
+  _${MODULE_NAME}/PipelineCreation/CodeGeneration/widget.py
+
+  Widgets/PipelineListWidget.py
+  Widgets/SelectPipelinePopUp.py
   )
 
 set(MODULE_PYTHON_RESOURCES
   Resources/Icons/${MODULE_NAME}.png
+  Resources/Icons/${MODULE_NAME}_template_icon.png
   Resources/UI/${MODULE_NAME}.ui
+  Resources/UI/SelectPipelinePopUp.ui
   )
 
 #-----------------------------------------------------------------------------

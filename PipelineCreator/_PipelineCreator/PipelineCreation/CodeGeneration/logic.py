@@ -7,14 +7,14 @@ from MRMLCorePython import vtkMRMLNode
 
 from slicer.parameterNodeWrapper import unannotatedType
 
-from _PipelineCreatorMk2.PipelineRegistrar import PipelineInfo
+from _PipelineCreator.PipelineRegistrar import PipelineInfo
 
-from _PipelineCreatorMk2.PipelineCreation.util import (
+from _PipelineCreator.PipelineCreation.util import (
     getStep,
     groupNodesByStep,
     splitParametersFromReturn,
 )
-from _PipelineCreatorMk2.PipelineCreation.CodeGeneration.util import (
+from _PipelineCreator.PipelineCreation.CodeGeneration.util import (
     CodePiece,
     cleanupImports,
     importCodeForType,

@@ -23,27 +23,27 @@ from slicer.parameterNodeWrapper import (
     parameterPack,
 )
 
-from _PipelineCreatorMk2.PipelineRegistrar import PipelineRegistrar, PipelineInfo
-from _PipelineCreatorMk2 import PipelineCreation
+from _PipelineCreator.PipelineRegistrar import PipelineRegistrar, PipelineInfo
+from _PipelineCreator import PipelineCreation
 
 from Widgets.PipelineListWidget import PipelineListWidget
 from Widgets.SelectPipelinePopUp import SelectPipelinePopUp
 
 __all__ = [
     "PipelineRegistrar", # repackage to public because PipelineListWidget uses it
-    "PipelineCreatorMk2",
-    "PipelineCreatorMk2Widget",
-    "PipelineCreatorMk2Logic",
+    "PipelineCreator",
+    "PipelineCreatorWidget",
+    "PipelineCreatorLogic",
     "singletonRegisterPipelineFunction",
-    "slicerPipelineMk2",
+    "slicerPipeline",
 ]
 
 
 #
-# PipelineCreatorMk2
+# PipelineCreator
 #
 
-class PipelineCreatorMk2(ScriptedLoadableModule):
+class PipelineCreator(ScriptedLoadableModule):
     """Uses ScriptedLoadableModule base class, available at:
     https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
     """
@@ -51,14 +51,14 @@ class PipelineCreatorMk2(ScriptedLoadableModule):
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
         # TODO: make this more human readable by adding spaces
-        self.parent.title = "PipelineCreatorMk2"
+        self.parent.title = "PipelineCreator"
         self.parent.categories = ["Pipelines"]
         self.parent.dependencies = []
         self.parent.contributors = ["Connor Bowley (Kitware, Inc.)"]
         # TODO: update with short description of the module and a link to online module documentation
         self.parent.helpText = """
 This is an example of scripted loadable module bundled in an extension.
-See more information in <a href="https://github.com/organization/projectname#PipelineCreatorMk2">module documentation</a>.
+See more information in <a href="https://github.com/organization/projectname#PipelineCreator">module documentation</a>.
 """
         # TODO: replace with organization, grant and thanks
         self.parent.acknowledgementText = """
@@ -68,21 +68,21 @@ and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR0132
 
 
 #
-# PipelineCreatorMk2ParameterNode
+# PipelineCreatorParameterNode
 #
 
 def _defaultIcon():
     # this will not change, but it can't be queried until this module is loaded
     return pathlib.Path(os.path.join(
-        os.path.dirname(slicer.util.modulePath(PipelineCreatorMk2.__name__)),
+        os.path.dirname(slicer.util.modulePath(PipelineCreator.__name__)),
         'Resources',
         'Icons',
-        'PipelineCreatorMk2_template_icon.png')
+        'PipelineCreator_template_icon.png')
     )
 
 
 @parameterNodeWrapper
-class PipelineCreatorMk2ParameterNode:
+class PipelineCreatorParameterNode:
     """
     The parameters needed by module.
     """
@@ -94,10 +94,10 @@ class PipelineCreatorMk2ParameterNode:
 
 
 #
-# PipelineCreatorMk2Widget
+# PipelineCreatorWidget
 #
 
-class PipelineCreatorMk2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
+class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     """Uses ScriptedLoadableModuleWidget base class, available at:
     https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/ScriptedLoadableModule.py
     """
@@ -123,7 +123,7 @@ class PipelineCreatorMk2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin
         # Load widget from .ui file (created by Qt Designer).
         # Additional widgets can be instantiated manually and added to self.layout.
         uiWidget = slicer.util.loadUI(
-            self.resourcePath('UI/PipelineCreatorMk2.ui'))
+            self.resourcePath('UI/PipelineCreator.ui'))
         self.layout.addWidget(uiWidget)
         self.ui = slicer.util.childWidgetVariables(uiWidget)
 
@@ -134,7 +134,7 @@ class PipelineCreatorMk2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin
 
         # Create logic class. Logic implements all computations that should be possible to run
         # in batch mode, without a graphical user interface.
-        self.logic = PipelineCreatorMk2Logic()
+        self.logic = PipelineCreatorLogic()
 
         # Finish adding the widgets
         self.ui.StepsContainerWidget.setLayout(qt.QVBoxLayout())
@@ -200,7 +200,7 @@ class PipelineCreatorMk2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin
 
         self.setParameterNode(self.logic.getParameterNode())
 
-    def setParameterNode(self, inputParameterNode: Optional[PipelineCreatorMk2ParameterNode]) -> None:
+    def setParameterNode(self, inputParameterNode: Optional[PipelineCreatorParameterNode]) -> None:
         """
         Set and observe parameter node.
         Observation is needed because when the parameter node is changed then the GUI must be updated immediately.
@@ -311,10 +311,10 @@ class PipelineCreatorMk2Widget(ScriptedLoadableModuleWidget, VTKObservationMixin
             raise
 
 #
-# PipelineCreatorMk2Logic
+# PipelineCreatorLogic
 #
 
-class PipelineCreatorMk2Logic(ScriptedLoadableModuleLogic):
+class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
     """This class should implement all the actual
     computation done by your module.  The interface
     should be such that other python code can import
@@ -339,7 +339,7 @@ class PipelineCreatorMk2Logic(ScriptedLoadableModuleLogic):
             self._registrar: PipelineRegistrar = PipelineRegistrar()
 
     def getParameterNode(self):
-        return PipelineCreatorMk2ParameterNode(super().getParameterNode())
+        return PipelineCreatorParameterNode(super().getParameterNode())
 
     #################################################################
     #
@@ -409,14 +409,14 @@ def singletonRegisterPipelineFunction(pipelineName, function, dependencies, cate
     the pipeline creator has already been loaded into slicer when it is called
     """
     def registerPipeline():
-        PipelineCreatorMk2Logic().registerPipeline(
+        PipelineCreatorLogic().registerPipeline(
             pipelineName, function, dependencies, categories)
     _callAfterAllTheseModulesLoaded(registerPipeline, dependencies)
 
 
-def slicerPipelineMk2(name=None, dependencies=None, categories=None):
+def slicerPipeline(name=None, dependencies=None, categories=None):
     """
-    Class decorator to automatically register a function with the PipelineCreatorMk2
+    Class decorator to automatically register a function with the PipelineCreator
     """
 
     def Inner(func):

@@ -8,7 +8,7 @@ import networkx as nx
 from slicer.parameterNodeWrapper import unannotatedType
 from MRMLCorePython import vtkMRMLNode
 
-from _PipelineCreatorMk2.PipelineRegistrar import PipelineInfo
+from _PipelineCreator.PipelineRegistrar import PipelineInfo
 
 
 __all__ = []

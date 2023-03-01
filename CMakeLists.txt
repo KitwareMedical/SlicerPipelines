@@ -23,8 +23,8 @@ add_subdirectory(LegacyPipelineCreator)
 add_subdirectory(LegacyPipelineModules)
 add_subdirectory(LegacyPipelineCLIBridge)
 add_subdirectory(LegacyPipelineCaseIterator)
-add_subdirectory(PipelineCreatorMk2)
-add_subdirectory(PipelineModulesMk2)
+add_subdirectory(PipelineCreator)
+add_subdirectory(PipelineModules)
 ## NEXT_MODULE
 
 #-----------------------------------------------------------------------------
