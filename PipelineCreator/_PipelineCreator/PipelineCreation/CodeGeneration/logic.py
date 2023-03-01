@@ -39,8 +39,8 @@ def _makeToplevelFunctionSignature(functionName, fullPipeline, returnType) -> st
     params, _ = getStep(0, fullPipeline)
     parameterString = ", ".join(f"{param[2]}: {typeAsCode(fullPipeline.nodes[param]['datatype'])}"
                                 for param in params)
-    necessaryImports = importCodeForType(returnType) + "\n" + importCodeForTypes(params, fullPipeline)
-    return f"{functionName}({parameterString}, *, delete_intermediate_nodes=True) -> {returnTypeCode}", necessaryImports
+    necessaryImports = "from PipelineCreator import PipelineProgressCallback\n" + importCodeForType(returnType) + "\n" + importCodeForTypes(params, fullPipeline)
+    return f"{functionName}({parameterString}, *, progress_callback=PipelineProgressCallback(), delete_intermediate_nodes=True) -> {returnTypeCode}", necessaryImports
 
 
 def _varName(node) -> str:
@@ -96,7 +96,7 @@ def _getInput(node, pipeline: nx.DiGraph) -> str:
         return _varName(list(pipeline.in_edges(node))[0][0])
 
 
-def _generateStepCode(step, pipeline: nx.DiGraph, registeredPipelines: dict[str, PipelineInfo], tab: str) -> str:
+def _generateStepCode(step, pipeline: nx.DiGraph, registeredPipelines: dict[str, PipelineInfo], numSteps, tab: str) -> str:
     """
     Each output node is given a well known variable name by the 
     """
@@ -111,10 +111,17 @@ def _generateStepCode(step, pipeline: nx.DiGraph, registeredPipelines: dict[str,
     stepFunctionName = _stepFunctionName(step)
     stepFunctionValue = _stepFunctionValue(step, registeredPipelines)
 
+    progressCallbackName = registeredPipelines[step[0][1]].progressCallbackName
+    if progressCallbackName is not None:
+        progressStr = f",\n{progressCallbackName}=progress_callback.getSubCallback({step[0][0] - 1}, {numSteps})"
+    else:
+        progressStr = ""
+
     stepCode = f"""# step {step[0][0]} - {step[0][1]}
+progress_callback.reportProgress("{step[0][1]}", 0, {step[0][0] - 1}, {numSteps})
 {stepFunctionName} = {stepFunctionValue}
 {", ".join(returnVariables)} = {stepFunctionName}(
-{stepArgumentsCode})
+{stepArgumentsCode}{progressStr})
 """
     return stepCode
 
@@ -150,7 +157,7 @@ def _generateRunFunction(pipeline: nx.DiGraph,
     steps = groupNodesByStep(pipeline)
     returnType = _getReturnType(steps[-1], pipeline)
     functionSignature, necessaryImports = _makeToplevelFunctionSignature(runFunctionName, pipeline, returnType)
-    body = "\n".join(_generateStepCode(step, pipeline, registeredPipelines, tab) for step in steps[1:-1])
+    body = "\n".join(_generateStepCode(step, pipeline, registeredPipelines, len(steps) - 2, tab) for step in steps[1:-1])
     returnStatement = _generateReturnStatement(steps[-1], pipeline)
 
     intermediateMRMLNodes = _getNamesOfMRMLNodeIntermediates(pipeline)
@@ -158,11 +165,14 @@ def _generateRunFunction(pipeline: nx.DiGraph,
     intermediateMRMLNodesDeletion = "\n".join(f"slicer.mrmlScene.RemoveNode({name})" for name in intermediateMRMLNodes)
     intermediateMRMLNodesDeletion = intermediateMRMLNodesDeletion or "pass"  # if empty, explicitly call pass
 
+    numSteps = max(1, len(steps) - 2)
+
     # note: Tabbing of body is handled by its respective function.
     # note: The extra pass is in case there are no pipeline steps.
     #       This can happen if the purpose of the pipeline is to filter down inputs.
     #       Not sure if this really ever useful, but it is easy to support.
     code = f"""def {functionSignature}:
+{tab}progress_callback.reportProgress("", 0, 0, {numSteps})
 {tab}# declare needed variables so they exist in the except clause
 {textwrap.indent(intermediateMRMLNodesDeclaration, tab)}
 
@@ -172,6 +182,8 @@ def _generateRunFunction(pipeline: nx.DiGraph,
 {tab}finally:
 {tab}{tab}if delete_intermediate_nodes:
 {textwrap.indent(intermediateMRMLNodesDeletion, tab * 3)}
+
+{tab}progress_callback.reportProgress("", 0, {numSteps}, {numSteps})
 
 {tab}{returnStatement}"""
 

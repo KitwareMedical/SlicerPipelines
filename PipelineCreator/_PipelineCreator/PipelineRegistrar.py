@@ -17,6 +17,7 @@ class PipelineInfo:
     function: typing.Callable
     parameters: dict[str, typing.Any]  # key: parameter name, value: type of parameter (could be annotated)
     returnType: typing.Any  # Some kind of type, but it could be annotated
+    progressCallbackName: typing.Optional[str]
     dependencies: list[str]
     categories: list[str]
 
@@ -66,6 +67,8 @@ class PipelineRegistrar:
 
         function: A type annotated function to make a pipeline of
         """
+        from PipelineCreator import isPipelineProgressCallback
+
         if name in self.registeredPipelines:
             raise RuntimeError(f"Cannot register pipeline with duplicate name '{name}'")
 
@@ -75,5 +78,13 @@ class PipelineRegistrar:
         parameterHints = {key: value for key, value in typehints.items() if key != "return"}
         returnHint = typehints["return"]
 
-        info = PipelineInfo(name, function, parameterHints, returnHint, dependencies, categories or [])
+        progressCallbacks = {key: value for key, value in parameterHints.items() if isPipelineProgressCallback(value)}
+        parameterHints = {key: value for key, value in parameterHints.items() if not isPipelineProgressCallback(value)}
+
+        if len(progressCallbacks) == 0:
+            progressCallbackName = None
+        else:
+            progressCallbackName = next(iter(progressCallbacks.keys()))
+
+        info = PipelineInfo(name, function, parameterHints, returnHint, progressCallbackName, dependencies, categories or [])
         self.registeredPipelines[name] = info
