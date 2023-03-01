@@ -227,29 +227,30 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 self.path = path
 
         tempDir = os.path.join(slicer.app.temporaryPath, f"TestPipeline-{id(self)}-{self._testNum}")
-        filepath = os.path.join(tempDir, f"{self._parameterNode.pipelineName}.py")
+        pipelineName = "PipelineCreatorTemporaryPipeline"
+        filepath = os.path.join(tempDir, f"{pipelineName}.py")
         print(f"Temporary pipeline at {filepath}")
         self._testNum += 1
-        self._generatePipeline(tempDir, popUpOnSuccess=False)
+        self._generatePipeline(pipelineName, tempDir, popUpOnSuccess=False)
 
         # load it as a Python module
-        spec = importlib.util.spec_from_file_location(self._parameterNode.pipelineName, filepath)
+        spec = importlib.util.spec_from_file_location(pipelineName, filepath)
         pipelineModule = importlib.util.module_from_spec(spec)
         # needs to exist in sys.modules for some of the parameterPack stuff to work
-        sys.modules[self._parameterNode.pipelineName] = pipelineModule
+        sys.modules[pipelineName] = pipelineModule
         # fake load it into the slicer infrastructure
-        setattr(slicer.modules, self._parameterNode.pipelineName.lower(), FakeSlicerModule(tempDir))
+        setattr(slicer.modules, pipelineName.lower(), FakeSlicerModule(tempDir))
         spec.loader.exec_module(pipelineModule)
 
-        pipelineWidget = getattr(pipelineModule, f"{self._parameterNode.pipelineName}Widget")()
+        pipelineWidget = getattr(pipelineModule, f"{pipelineName}Widget")()
 
         def onBack():
-            # when we leave the testing, move clean up after ourselves
+            # when we leave the testing, clean up after ourselves
             self.ui.StackedWidget.setCurrentIndex(0)
             self.ui.StackedWidget.removeWidget(widget)
             shutil.rmtree(tempDir)
-            sys.modules.pop(self._parameterNode.pipelineName)
-            delattr(slicer.modules, self._parameterNode.pipelineName.lower())
+            sys.modules.pop(pipelineName)
+            delattr(slicer.modules, pipelineName.lower())
             # need to completely clear up the underlying parameter node in case we retest with the same widget.
             pipelineWidget.exit()
             pipelineWidget._parameterNode.parameterNode.RemoveAllObservers()
@@ -268,7 +269,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.StackedWidget.setCurrentIndex(index)
 
     def onGeneratePipeline(self):
-        self._generatePipeline(self._parameterNode.outputDirectory)
+        self._generatePipeline(self._parameterNode.pipelineName, self._parameterNode.outputDirectory)
 
         # this only runs if the generation didn't throw
         pipelineName = self._parameterNode.pipelineName
@@ -292,9 +293,8 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 rawSearchPaths.append(str(outputDirectory))
                 settings.setValue("Modules/AdditionalPaths", rawSearchPaths)
 
-    def _generatePipeline(self, outputDirectory, popUpOnSuccess=True):
+    def _generatePipeline(self, pipelineName, outputDirectory, popUpOnSuccess=True):
         try:
-            pipelineName = self._parameterNode.pipelineName
             self.logic.createPipeline(
                 pipelineName,
                 outputDirectory,
