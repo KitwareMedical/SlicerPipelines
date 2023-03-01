@@ -2,7 +2,11 @@ from typing import Annotated
 
 import slicer
 from slicer.parameterNodeWrapper import (
+    Decimals,
+    Default,
     Minimum,
+    SingleStep,
+    WithinRange,
 )
 from MRMLCorePython import vtkMRMLModelNode
 
@@ -32,7 +36,100 @@ def _surfaceToolboxRun(mesh: vtkMRMLModelNode,
         slicer.mrmlScene.RemoveNode(parameterNode)
 
 
-@slicerPipeline(name="SurfaceToolbox.ScaleMesh", dependencies=["SurfaceToolbox"], categories=["SurfaceToolbox", "Model Operations"])
+_surfaceToolboxDeps = ["SurfaceToolbox"]
+_surfaceToolboxCats = ["SurfaceToolbox", "Model Operations"]
+
+
+def formatBool(cond):
+    return "true" if cond else "false"
+
+
+@slicerPipeline(name="SurfaceToolbox.Clean", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
+def clean(mesh: vtkMRMLModelNode) -> vtkMRMLModelNode:
+    return _surfaceToolboxRun(mesh, "cleaner", {})
+
+
+@slicerPipeline(name="SurfaceToolbox.UniformRemesh", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
+def remesh(mesh: vtkMRMLModelNode,
+           numPoints: Annotated[int, WithinRange(100, 100000), Default(10000)],
+           subdivide: Annotated[int, WithinRange(0, 8)]) -> vtkMRMLModelNode:
+    return _surfaceToolboxRun(mesh, "remesh", {
+        "remeshSubdivide": str(subdivide),
+        "remeshClustersK": str(numPoints / 1000),
+    })
+
+
+@slicerPipeline(name="SurfaceToolbox.Decimate", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
+def decimation(mesh: vtkMRMLModelNode,
+               reduction: Annotated[float, WithinRange(0, 1), Default(0.8), Decimals(2), SingleStep(0.01)],
+               boundaryDeletion: Annotated[bool, Default(True)]) -> vtkMRMLModelNode:
+    return _surfaceToolboxRun(mesh, "decimation", {
+        "decimationReduction": str(reduction),
+        "decimationBoundaryDeletion": formatBool(boundaryDeletion)
+    })
+
+
+@slicerPipeline(name="SurfaceToolbox.Smoothing.Taubin", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
+def taubinSmoothing(mesh: vtkMRMLModelNode,
+                    iterations: Annotated[int, WithinRange(0, 100), Default(30)],
+                    passBand: Annotated[float, WithinRange(0, 2), Default(0.1), Decimals(4), SingleStep(0.0001)],
+                    boundarySmoothing: Annotated[bool, Default(True)]) -> vtkMRMLModelNode:
+    return _surfaceToolboxRun(mesh, "smoothing", {
+        "smoothingMethod": "Taubin",
+        "smoothingTaubinIterations": str(iterations),
+        "smoothingTaubinPassBand": str(passBand),
+        "smoothingBoundarySmoothing": formatBool(boundarySmoothing),
+    })
+
+
+@slicerPipeline(name="SurfaceToolbox.Smoothing.Laplace", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
+def laplaceSmoothing(mesh: vtkMRMLModelNode,
+                    iterations: Annotated[int, WithinRange(0, 500), Default(100)],
+                    relaxation: Annotated[float, WithinRange(0, 1), Default(0.5), Decimals(1), SingleStep(0.1)],
+                    boundarySmoothing: Annotated[bool, Default(True)]) -> vtkMRMLModelNode:
+    return _surfaceToolboxRun(mesh, "smoothing", {
+        "smoothingMethod": "Laplace",
+        "smoothingLaplaceIterations": str(iterations),
+        "smoothingLaplaceRelaxation": str(relaxation),
+        "smoothingBoundarySmoothing": formatBool(boundarySmoothing),
+    })
+
+
+@slicerPipeline(name="SurfaceToolbox.FillHoles", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
+def fillHoles(mesh: vtkMRMLModelNode,
+              maxHoleSize: Annotated[float, WithinRange(0, 1000), Default(1000), Decimals(1), SingleStep(0.1)]) -> vtkMRMLModelNode:
+    return _surfaceToolboxRun(mesh, "fillHoles", {
+        "fillHolesSize": str(maxHoleSize),
+    })
+
+
+@slicerPipeline(name="SurfaceToolbox.Normals", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
+def normals(mesh: vtkMRMLModelNode,
+            autoOrientNormals: bool,
+            flipNormals: bool,
+            splitting: bool,
+            featureAngleForSplitting: Annotated[float, WithinRange(0, 180), Default(30)]) -> vtkMRMLModelNode:
+    return _surfaceToolboxRun(mesh, "normals", {
+        "normalsOrient": formatBool(autoOrientNormals),
+        "normalsFlip": formatBool(flipNormals),
+        "normalsSplitting": formatBool(splitting),
+        "normalsFeatureAngle": str(featureAngleForSplitting),
+    })
+
+
+@slicerPipeline(name="SurfaceToolbox.Mirror", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
+def mirrorMesh(mesh: vtkMRMLModelNode,
+               mirrorX: bool,
+               mirrorY: bool,
+               mirrorZ: bool) -> vtkMRMLModelNode:
+    return _surfaceToolboxRun(mesh, "mirror", {
+        "mirrorX": formatBool(mirrorX),
+        "mirrorY": formatBool(mirrorY),
+        "mirrorZ": formatBool(mirrorZ),
+    })
+
+
+@slicerPipeline(name="SurfaceToolbox.ScaleMesh", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
 def scaleMesh(mesh: vtkMRMLModelNode,
               scaleX: Annotated[float, Minimum(0)],
               scaleY: Annotated[float, Minimum(0)],
@@ -45,7 +142,7 @@ def scaleMesh(mesh: vtkMRMLModelNode,
     })
 
 
-@slicerPipeline(name="SurfaceToolbox.TranslateMesh", dependencies=["SurfaceToolbox"], categories=["SurfaceToolbox", "Model Operations"])
+@slicerPipeline(name="SurfaceToolbox.TranslateMesh", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
 def translateMesh(mesh: vtkMRMLModelNode,
                   translateX: float,
                   translateY: float,
@@ -57,13 +154,22 @@ def translateMesh(mesh: vtkMRMLModelNode,
     })
 
 
-@slicerPipeline(name="SurfaceToolbox.Mirror", dependencies=["SurfaceToolbox"], categories=["SurfaceToolbox", "Model Operations"])
-def mirrorMesh(mesh: vtkMRMLModelNode,
-               mirrorX: bool,
-               mirrorY: bool,
-               mirrorZ: bool) -> vtkMRMLModelNode:
-    return _surfaceToolboxRun(mesh, "mirror", {
-        "mirrorX": "true" if mirrorX else "false",
-        "mirrorY": "true" if mirrorY else "false",
-        "mirrorZ": "true" if mirrorZ else "false",
+@slicerPipeline(name="SurfaceToolbox.ExtractEdges", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
+def extractEdges(mesh: vtkMRMLModelNode,
+              boundaryEdges: Annotated[bool, Default(True)],
+              featureEdges: Annotated[bool, Default(True)],
+              featureAngle: Annotated[float, WithinRange(0, 180), Default(20)],
+              manifoldEdges: bool,
+              nonManifoldEdges: bool) -> vtkMRMLModelNode:
+
+    return _surfaceToolboxRun(mesh, "extractEdges", {
+        "extractEdgesBoundary": formatBool(boundaryEdges),
+        "extractEdgesFeature": formatBool(featureEdges),
+        "extractEdgesFeatureAngle": str(featureAngle),
+        "extractEdgesManifold": formatBool(manifoldEdges),
+        "extractEdgesNonManifold": formatBool(nonManifoldEdges),
     })
+
+@slicerPipeline(name="SurfaceToolbox.ExtractLargestComponent", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
+def extractLargestComponent(mesh: vtkMRMLModelNode) -> vtkMRMLModelNode:
+    return _surfaceToolboxRun(mesh, "connectivity", {})
