@@ -693,7 +693,7 @@ class PipelineListWidget(qt.QWidget):
 
         self.setLayout(qt.QVBoxLayout())
         self.styleSheet = '[PipelineStepCollapsible="true"]{background-color: palette(dark)}'
-        self._inputsWidget = PipelineInputWidget(0, "Inputs", "inputValue", sorted(list(registrar.pipelinedTypes), key=lambda t: t.__name__))
+        self._inputsWidget = PipelineInputWidget(0, "Inputs", "inputValue", sorted(list(registrar.pipelinedTypes), key=lambda t: t.__name__.lower()))
         self._inputsWidget.valueChanged.connect(self._updateSteps)
 
         self._stepsContainer = qt.QWidget()
