@@ -1,6 +1,7 @@
 import importlib
 import os
 import pickle  # this shows as unused but is used by test_cleanType during the eval
+import sys
 import tempfile
 from typing import Annotated
 import unittest
@@ -14,25 +15,38 @@ import vtk
 
 from slicer.parameterNodeWrapper import (
     findChildWidgetForParameter,
+    parameterPack,
+    Decimals,
+    Default,
+    Minimum,
+    SingleStep,
     WithinRange,
 )
 
 from MRMLCorePython import (
     vtkMRMLModelNode,
+    vtkMRMLScalarVolumeNode,
+    vtkMRMLSegmentationNode,
 )
 
 from PipelineCreator import PipelineCreatorWidget, PipelineCreatorLogic
 from _PipelineCreator import PipelineCreation
 
+class TempPythonModule:
+    def __init__(self, codeAsString):
+        self.codeAsString = codeAsString
 
-# note: creates _Python_ module not _slicer_ module
-def createTempPythonModule(codeAsString):
-    # load the generated code into a temporary module
-    # https://stackoverflow.com/a/60054279
-    spec = importlib.util.spec_from_loader('tempModule', loader=None)
-    tempModule = importlib.util.module_from_spec(spec)
-    exec(codeAsString, tempModule.__dict__)
-    return tempModule
+    def __enter__(self):
+        # load the generated code into a temporary module
+        # https://stackoverflow.com/a/60054279
+        spec = importlib.util.spec_from_loader('tempModule', loader=None)
+        self.tempModule = importlib.util.module_from_spec(spec)
+        sys.modules['tempModule'] = self.tempModule
+        exec(self.codeAsString, self.tempModule.__dict__)
+        return self.tempModule
+    
+    def __exit__(self, type, value, traceback):
+        sys.modules.pop('tempModule')
 
 def findChildWithProperty(widget, property, propertyValue):
     for child in widget.findChildren(qt.QObject):
@@ -85,6 +99,45 @@ def makeSphereModel(self):
     self.assertEqual(model.GetMesh().GetCenter(), (0.0, 0.0, 0.0))
     return model
 
+@parameterPack
+class SegmentationAndReferenceVolume:
+    segmentation: vtkMRMLSegmentationNode
+    referenceVolume: vtkMRMLScalarVolumeNode
+
+# test a very real world pipeline that was causing issues
+def exportModelToSegmentationSpacing(model: vtkMRMLModelNode,
+                                     spacingX: Annotated[float, Minimum(0), Default(0.1), Decimals(2), SingleStep(0.01)],
+                                     spacingY: Annotated[float, Minimum(0), Default(0.1), Decimals(2), SingleStep(0.01)],
+                                     spacingZ: Annotated[float, Minimum(0), Default(0.1), Decimals(2), SingleStep(0.01)],
+                                     marginX: Annotated[float, Minimum(0), Default(1), Decimals(1), SingleStep(0.1)],
+                                     marginY: Annotated[float, Minimum(0), Default(1), Decimals(1), SingleStep(0.1)],
+                                     marginZ: Annotated[float, Minimum(0), Default(1), Decimals(1), SingleStep(0.1)]) -> SegmentationAndReferenceVolume:
+    volumeMargin = [marginX, marginY, marginZ]
+    volumeSpacing = [spacingX, spacingY, spacingZ]
+    
+    #create reference volume
+    bounds = [0.]*6
+    model.GetBounds(bounds)
+    imageData = vtk.vtkImageData()
+    imageSize = [int((bounds[axis * 2 + 1] - bounds[axis * 2] + volumeMargin[axis] * 2.0) / volumeSpacing[axis]) for axis in range(3)]
+    imageOrigin = [ bounds[axis * 2] - volumeMargin[axis] for axis in range(3) ]
+    imageData.SetDimensions(imageSize)
+    imageData.AllocateScalars(vtk.VTK_UNSIGNED_CHAR, 1)
+    imageData.GetPointData().GetScalars().Fill(0)
+    referenceVolumeNode = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
+    referenceVolumeNode.SetName(f"{model.GetName()}_ReferenceVolume")
+    referenceVolumeNode.SetOrigin(imageOrigin)
+    referenceVolumeNode.SetSpacing(volumeSpacing)
+    referenceVolumeNode.SetAndObserveImageData(imageData)
+    referenceVolumeNode.CreateDefaultDisplayNodes()
+
+    segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode')
+    segmentationNode.CreateDefaultDisplayNodes()
+    segmentationNode.SetReferenceImageGeometryParameterFromVolumeNode(referenceVolumeNode)
+    slicer.modules.segmentations.logic().ImportModelToSegmentationNode(model, segmentationNode)
+
+    return SegmentationAndReferenceVolume(segmentationNode, referenceVolumeNode)
+
 class _SomeClass:
     pass
 
@@ -93,11 +146,22 @@ class _SomeClass:
 def add(a: int, b: int) -> int:
     return a + b
 
+def addFloat(a: float, b: float) -> float:
+    return a + b
+
 def multiply(a: int, b: int) -> int:
     return a * b
 
 def strlen(s: str) -> int:
     return len(s)
+
+@parameterPack
+class PlusMinus:
+    positive: int
+    negative: int
+
+def plusMinus(a: int) -> PlusMinus:
+    return PlusMinus(a, -a)
 
 def makeTestMathPipeline(registeredPipelines):
     """
@@ -425,18 +489,18 @@ class PipelineCreatorCodeGenModuleTests(unittest.TestCase):
             def __init__(self):
                 self.path = slicer.app.temporaryPath
 
-        tempPyModule = createTempPythonModule(fullCode)
-        parent = ParentClass()
-        module = tempPyModule.TestPipeline(parent)
+        with TempPythonModule(fullCode) as tempPyModule:
+            parent = ParentClass()
+            module = tempPyModule.TestPipeline(parent)
 
-        self.assertIsInstance(module, slicer.ScriptedLoadableModule.ScriptedLoadableModule)
-        self.assertEqual(tempPyModule.TestPipeline.__name__, "TestPipeline")
-        self.assertEqual(parent.title, "Test Pipeline")
-        self.assertEqual(parent.categories, ["Examples", "Tests"])
-        self.assertEqual(parent.dependencies, ["PipelineCreator"])
-        self.assertEqual(parent.contributors, ["Connor Bowley"])
-        self.assertEqual(parent.helpText, "This is a test")
-        self.assertEqual(parent.acknowledgementText, "SlicerSALT is great")
+            self.assertIsInstance(module, slicer.ScriptedLoadableModule.ScriptedLoadableModule)
+            self.assertEqual(tempPyModule.TestPipeline.__name__, "TestPipeline")
+            self.assertEqual(parent.title, "Test Pipeline")
+            self.assertEqual(parent.categories, ["Examples", "Tests"])
+            self.assertEqual(parent.dependencies, ["PipelineCreator"])
+            self.assertEqual(parent.contributors, ["Connor Bowley"])
+            self.assertEqual(parent.helpText, "This is a test")
+            self.assertEqual(parent.acknowledgementText, "SlicerSALT is great")
 
 class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
     def setUp(self) -> None:
@@ -450,22 +514,116 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         # math pipelines
         self.logic.registerPipeline("add", add, [])
         self.logic.registerPipeline("multiply", multiply, [])
+        self.logic.registerPipeline("plusMinus", plusMinus, [])
         self.logic.registerPipeline("strlen", strlen, [])
 
     def test_logic(self):
         pipeline = makeTestMathPipeline(self.logic.registeredPipelines)
 
         from _PipelineCreator.PipelineCreation.CodeGeneration.logic import createLogic
-        code = createLogic("TestPipelineLogic", pipeline, self.logic.registeredPipelines, tab=" "*4)
+        code = createLogic("TestPipelineLogic", pipeline, self.logic.registeredPipelines, "", tab=" "*4)
         fullCode = "\n".join([code.imports, code.code])
 
-        tempModule = createTempPythonModule(fullCode)
-        logic = tempModule.TestPipelineLogic()
-        self.assertIsInstance(logic, slicer.ScriptedLoadableModule.ScriptedLoadableModuleLogic)
-        self.assertEqual(tempModule.TestPipelineLogic.__name__, "TestPipelineLogic")
-        self.assertEqual(logic.run("hi", 2, 3), funcTestMathPipeline("hi", 2, 3))
-        self.assertEqual(logic.run("hello", 12, -3), funcTestMathPipeline("hello", 12, -3))
-        self.assertEqual(logic.run("", 0, 0), funcTestMathPipeline("", 0, 0))
+        with TempPythonModule(fullCode) as tempModule:
+            logic = tempModule.TestPipelineLogic()
+            self.assertIsInstance(logic, slicer.ScriptedLoadableModule.ScriptedLoadableModuleLogic)
+            self.assertEqual(tempModule.TestPipelineLogic.__name__, "TestPipelineLogic")
+            self.assertEqual(logic.run("hi", 2, 3), funcTestMathPipeline("hi", 2, 3))
+            self.assertEqual(logic.run("hello", 12, -3), funcTestMathPipeline("hello", 12, -3))
+            self.assertEqual(logic.run("", 0, 0), funcTestMathPipeline("", 0, 0))
+
+    def test_multiple_overall_outputs(self):
+        pipeline = nx.DiGraph()
+
+        # structure - None means overall input/output levels
+        pipeline.add_node((0, None, "a"), datatype=int, position=0)
+        pipeline.add_node((0, None, "b"), datatype=int, position=1)
+
+        pipeline.add_node((1, "add", "a"))
+        pipeline.add_node((1, "add", "b"))
+        pipeline.add_node((1, "add", "return"))
+
+        pipeline.add_node((2, "multiply", "a"))
+        pipeline.add_node((2, "multiply", "b"))
+        pipeline.add_node((2, "multiply", "return"))
+
+        pipeline.add_node((3, None, "summation"), datatype=int, position=0)
+        pipeline.add_node((3, None, "multiplication"), datatype=int, position=1)
+
+        numNodes = len(pipeline.nodes)
+        pipeline.add_edges_from([
+            # connections into step 1
+            ((0, None, "a"), (1, "add", "a")),
+            ((0, None, "b"), (1, "add", "b")),
+            # connections into step 2
+            ((0, None, "a"), (2, "multiply", "a")),
+            ((0, None, "b"), (2, "multiply", "b")),
+            # final output
+            ((1, "add", "return"), (3, None, "summation")),
+            ((2, "multiply", "return"), (3, None, "multiplication")),
+        ])
+        assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
+        PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
+
+        from _PipelineCreator.PipelineCreation.CodeGeneration import createLogic, createParameterNode
+        paramNodeCode = createParameterNode("TestPipeline", pipeline, tab=" "*4)
+        logicCode = createLogic("TestPipelineLogic", pipeline, self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
+        fullCode = "\n".join([paramNodeCode.imports, logicCode.imports, paramNodeCode.code, logicCode.code])
+
+        with TempPythonModule(fullCode) as tempModule:
+            logic = tempModule.TestPipelineLogic()
+            self.assertIsInstance(logic, slicer.ScriptedLoadableModule.ScriptedLoadableModuleLogic)
+            self.assertEqual(tempModule.TestPipelineLogic.__name__, "TestPipelineLogic")
+            self.assertEqual(logic.run(1, 1), tempModule.TestPipelineOutputs(2, 1))
+            self.assertEqual(logic.run(2, 2), tempModule.TestPipelineOutputs(4, 4))
+            self.assertEqual(logic.run(3, 4), tempModule.TestPipelineOutputs(7, 12))
+
+    def test_parameter_pack_intermediate_output(self):
+        pipeline = nx.DiGraph()
+
+        # structure - None means overall input/output levels
+        pipeline.add_node((0, None, "a"), datatype=int, position=0)
+
+        pipeline.add_node((1, "plusMinus", "a"))
+        pipeline.add_node((1, "plusMinus", "return"))
+        pipeline.add_node((1, "plusMinus", "return.positive"))
+        pipeline.add_node((1, "plusMinus", "return.negative"))
+
+        pipeline.add_node((2, "multiply", "a"))
+        pipeline.add_node((2, "multiply", "b"))
+        pipeline.add_node((2, "multiply", "return"))
+
+        pipeline.add_node((3, None, "pos"), datatype=int, position=0)
+        pipeline.add_node((3, None, "neg"), datatype=int, position=1)
+        pipeline.add_node((3, None, "multiplication"), datatype=int, position=2)
+
+        numNodes = len(pipeline.nodes)
+        pipeline.add_edges_from([
+            # connections into step 1
+            ((0, None, "a"), (1, "plusMinus", "a")),
+            # connections into step 2
+            ((1, "plusMinus", "return.positive"), (2, "multiply", "a")),
+            ((1, "plusMinus", "return.negative"), (2, "multiply", "b")),
+            # final output
+            ((1, "plusMinus", "return.positive"), (3, None, "pos")),
+            ((1, "plusMinus", "return.negative"), (3, None, "neg")),
+            ((2, "multiply", "return"), (3, None, "multiplication")),
+        ])
+        assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
+        PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
+
+        from _PipelineCreator.PipelineCreation.CodeGeneration import createLogic, createParameterNode
+        paramNodeCode = createParameterNode("TestPipeline", pipeline, tab=" "*4)
+        logicCode = createLogic("TestPipelineLogic", pipeline, self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
+        fullCode = "\n".join([paramNodeCode.imports, logicCode.imports, paramNodeCode.code, logicCode.code])
+
+        with TempPythonModule(fullCode) as tempModule:
+            logic = tempModule.TestPipelineLogic()
+            self.assertIsInstance(logic, slicer.ScriptedLoadableModule.ScriptedLoadableModuleLogic)
+            self.assertEqual(tempModule.TestPipelineLogic.__name__, "TestPipelineLogic")
+            self.assertEqual(logic.run(1), tempModule.TestPipelineOutputs(1, -1, -1))
+            self.assertEqual(logic.run(-2), tempModule.TestPipelineOutputs(-2, 2, -4))
+            self.assertEqual(logic.run(3), tempModule.TestPipelineOutputs(3, -3, -9))
 
     def test_delete_intermediate_nodes(self):
         # structure - None means overall input/output levels
@@ -498,18 +656,18 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
 
         from _PipelineCreator.PipelineCreation.CodeGeneration.logic import createLogic
-        code = createLogic("TestPipelineLogicDeleteIntermediates", pipeline, self.logic.registeredPipelines, tab=" "*4)
+        code = createLogic("TestPipelineLogicDeleteIntermediates", pipeline, self.logic.registeredPipelines, "", tab=" "*4)
         fullCode = "\n".join([code.imports, code.code])
 
-        tempModule = createTempPythonModule(fullCode)
-        logic = tempModule.TestPipelineLogicDeleteIntermediates()
+        with TempPythonModule(fullCode) as tempModule:
+            logic = tempModule.TestPipelineLogicDeleteIntermediates()
 
-        model = makeSphereModel(self)
-        numModels = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
-        _ = logic.run(model, delete_intermediate_nodes=False)
-        # make sure there is an intermediate results still remaining for each step
-        newNumModels = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
-        self.assertEqual(newNumModels - numModels, 2)
+            model = makeSphereModel(self)
+            numModels = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
+            _ = logic.run(model, delete_intermediate_nodes=False)
+            # make sure there is an intermediate results still remaining for each step
+            newNumModels = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
+            self.assertEqual(newNumModels - numModels, 2)
 
 
 class PipelineCreatorFullTests(unittest.TestCase):
@@ -521,8 +679,10 @@ class PipelineCreatorFullTests(unittest.TestCase):
         self.logic.registerPipeline("centerOfX", centerOfX, [])
         self.logic.registerPipeline("decimation", decimation, [])
         self.logic.registerPipeline("translate", translate, [])
+        self.logic.registerPipeline("exportModelToSegmentationSpacing", exportModelToSegmentationSpacing, [])
         # math pipelines
         self.logic.registerPipeline("add", add, [])
+        self.logic.registerPipeline("addFloat", addFloat, [])
         self.logic.registerPipeline("multiply", multiply, [])
         self.logic.registerPipeline("strlen", strlen, [])
 
@@ -631,11 +791,6 @@ class PipelineCreatorFullTests(unittest.TestCase):
 
     def test_the_whole_shebang(self):
         slicer.mrmlScene.Clear()
-        self.logic = PipelineCreatorLogic(False)
-        self.logic.registerPipeline("passthru", passthru, [])
-        self.logic.registerPipeline("centerOfX", centerOfX, [])
-        self.logic.registerPipeline("decimation", decimation, [])
-        self.logic.registerPipeline("translate", translate, [])
 
         pipeline = nx.DiGraph(name="Decimate then Translate")
 
@@ -749,3 +904,190 @@ class PipelineCreatorFullTests(unittest.TestCase):
 
             self.assertEqual(slicer.mrmlScene.GetNumberOfNodes(), numNodes)
             # import pdb; pdb.set_trace()
+
+    def test_the_whole_shebang_multiple_output(self):
+        slicer.mrmlScene.Clear()
+
+        pipeline = nx.DiGraph(name="Multi output")
+
+        # structure - None means overall input/output levels
+        pipeline.add_node((0, None, "mesh"), datatype=vtkMRMLModelNode, position=0)
+        pipeline.add_node((0, None, "reduction"), datatype=float, position=1)
+        pipeline.add_node((0, None, "translateX"), datatype=float, position=2)
+        pipeline.add_node((0, None, "translateY"), datatype=float, position=3)
+
+        pipeline.add_node((1, "decimation", "mesh"))
+        pipeline.add_node((1, "decimation", "reduction"))
+        pipeline.add_node((1, "decimation", "return"))
+
+        pipeline.add_node((2, "translate", "mesh"))
+        pipeline.add_node((2, "translate", "x"))
+        pipeline.add_node((2, "translate", "y"))
+        pipeline.add_node((2, "translate", "z"))
+        pipeline.add_node((2, "translate", "return"))
+
+        pipeline.add_node((3, "addFloat", "a"))
+        pipeline.add_node((3, "addFloat", "b"))
+        pipeline.add_node((3, "addFloat", "return"))
+
+        pipeline.add_node((4, None, "mesh"), datatype=vtkMRMLModelNode, position=0)
+        pipeline.add_node((4, None, "xyTranslationSum"), datatype=float, position=1)
+
+        # connectivity
+        numNodes = len(pipeline.nodes)
+        pipeline.add_edges_from([
+            # connections into step 1
+            ((0, None, "mesh"),           (1, "decimation", "mesh")),
+            ((0, None, "reduction"),      (1, "decimation", "reduction")),
+            # connections into step 2
+            ((0, None, "translateX"),     (2, "translate", "x")),
+            ((0, None, "translateY"),     (2, "translate", "y")),
+            ((1, "decimation", "return"), (2, "translate", "mesh")),
+            # connections into step 3
+            ((0, None, "translateX"),     (3, "addFloat", "a")),
+            ((0, None, "translateY"),     (3, "addFloat", "b")),
+            # final output
+            ((2, "translate", "return"),  (4, None, "mesh")),
+            ((3, "addFloat", "return"),   (4, None, "xyTranslationSum")),
+        ])
+        assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
+
+        # fixed values
+        pipeline.nodes[(2, "translate", "z")]["fixed_value"] = 0
+
+        moduleName = "PipelineCreatorTestModuleMultiOutput"
+
+        with tempfile.TemporaryDirectory() as tempDir:
+            # Make output
+            self.logic.createPipeline(
+                name=moduleName,
+                outputDirectory=tempDir,
+                pipeline=pipeline,
+            )
+
+            # test loading the new slicer module
+            factory = slicer.app.moduleManager().factoryManager()
+            factory.registerModule(qt.QFileInfo(os.path.join(tempDir, moduleName + ".py")))
+            factory.loadModules([moduleName])
+
+            slicer.util.selectModule(moduleName)
+
+            widget = slicer.modules.PipelineCreatorTestModuleMultiOutputWidget
+
+            model = makeSphereModel(self)
+            outputModel = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLModelNode")
+            numModels = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
+
+            meshWidget = findChildWidgetForParameter(widget.paramWidget, "inputs.mesh")
+            reductionWidget = findChildWidgetForParameter(widget.paramWidget, "inputs.reduction")
+            translateXWidget = findChildWidgetForParameter(widget.paramWidget, "inputs.translateX")
+            translateYWidget = findChildWidgetForParameter(widget.paramWidget, "inputs.translateY")
+            outputMeshWidget = findChildWidgetForParameter(widget.paramWidget, "outputs.mesh")
+            outputXYSumWidget = findChildWidgetForParameter(widget.paramWidget, "outputs.xyTranslationSum")
+
+            meshWidget.setCurrentNode(model)
+            reductionWidget.value = 0.5
+            translateXWidget.value = 100
+            translateYWidget.value = -33.3
+
+            outputMeshWidget.setCurrentNode(outputModel)
+
+            widget.runButton.click()
+
+            self.assertAlmostEqual(outputModel.GetMesh().GetCenter()[0], 100, 5)
+            self.assertAlmostEqual(outputModel.GetMesh().GetCenter()[1], -33.3, 5)
+            self.assertAlmostEqual(outputModel.GetMesh().GetCenter()[2], 0, 5)
+            # decimate is a target reduction, not a guarantee, so use a forgiving check
+            self.assertLess(outputModel.GetMesh().GetNumberOfCells(), model.GetMesh().GetNumberOfCells())
+
+            self.assertAlmostEqual(outputXYSumWidget.value, 66.7, 5)
+
+            # make sure there are no intermediate results hanging.
+            # note: we gave an output node so there should be _no_ new nodes
+            self.assertEqual(slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode"), numModels)
+
+
+    def test_the_whole_shebang_single_parameterPack_output(self):
+        slicer.mrmlScene.Clear()
+
+        pipeline = nx.DiGraph(name="Multi output")
+
+        # structure - None means overall input/output levels
+        pipeline.add_node((0, None, "mesh"), datatype=vtkMRMLModelNode, position=0)
+
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "model"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "spacingX"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "spacingY"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "spacingZ"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "marginX"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "marginY"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "marginZ"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "return"))
+
+        pipeline.add_node((2, None, "segAndVol"), datatype=SegmentationAndReferenceVolume)
+
+        # connectivity
+        numNodes = len(pipeline.nodes)
+        pipeline.add_edges_from([
+            # connections into step 1
+            ((0, None, "mesh"),           (1, "exportModelToSegmentationSpacing", "model")),
+            # final output
+            ((1, "exportModelToSegmentationSpacing", "return"),  (2, None, "segAndVol")),
+        ])
+        assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
+
+        # fixed values
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "spacingX")]["fixed_value"] = 0.1
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "spacingY")]["fixed_value"] = 0.1
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "spacingZ")]["fixed_value"] = 0.1
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "marginX")]["fixed_value"] = 1
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "marginY")]["fixed_value"] = 1
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "marginZ")]["fixed_value"] = 1
+
+        moduleName = "PipelineCreatorTestModuleParameterPackOutput"
+
+        with tempfile.TemporaryDirectory() as tempDir:
+            # Make output
+            self.logic.createPipeline(
+                name=moduleName,
+                outputDirectory=tempDir,
+                pipeline=pipeline,
+            )
+
+            with open(os.path.join(tempDir, f"{moduleName}.py")) as f:
+                print(f.read())
+
+            # test loading the new slicer module
+            factory = slicer.app.moduleManager().factoryManager()
+            factory.registerModule(qt.QFileInfo(os.path.join(tempDir, moduleName + ".py")))
+            factory.loadModules([moduleName])
+
+            slicer.util.selectModule(moduleName)
+
+            widget = slicer.modules.PipelineCreatorTestModuleParameterPackOutputWidget
+
+            model = makeSphereModel(self)
+            outputSeg = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
+            outputVol = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLScalarVolumeNode")
+
+            numModels = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
+            numSegs = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLSegmentationNode")
+            numVols = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLScalarVolumeNode")
+
+            meshWidget = findChildWidgetForParameter(widget.paramWidget, "inputs.mesh")
+            outputSegWidget = findChildWidgetForParameter(widget.paramWidget, "outputs.segAndVol.segmentation")
+            outputVolWidget = findChildWidgetForParameter(widget.paramWidget, "outputs.segAndVol.referenceVolume")
+
+            meshWidget.setCurrentNode(model)
+            outputSegWidget.setCurrentNode(outputSeg)
+            outputVolWidget.setCurrentNode(outputVol)
+
+            widget.runButton.click()
+
+            self.assertEqual(outputSeg.GetSegmentation().GetNumberOfSegments(), 1)
+
+            # make sure there are no intermediate results hanging.
+            # note: we gave an output node so there should be _no_ new nodes
+            self.assertEqual(slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode"), numModels)
+            self.assertEqual(slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLSegmentationNode"), numSegs)
+            self.assertEqual(slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLScalarVolumeNode"), numVols)

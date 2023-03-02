@@ -4,8 +4,6 @@ import networkx as nx
 
 from MRMLCorePython import vtkMRMLNode
 
-from slicer.parameterNodeWrapper import unannotatedType
-
 from _PipelineCreator.PipelineCreation.CodeGeneration.util import CodePiece
 
 from _PipelineCreator.PipelineCreation.util import (
@@ -14,106 +12,71 @@ from _PipelineCreator.PipelineCreation.util import (
 from _PipelineCreator.PipelineCreation.CodeGeneration.util import (
     CodePiece,
     cleanupImports,
-    importCodeForTypes,
-    typeAsCode,
 )
 
-def createParameterPack(name: str, step: int, pipeline: nx.DiGraph, tab: str=" "*4):
-    # the overall input will be put in a parameterNodeWrapper
-    params, _ = getStep(step, pipeline)
 
-    imports = f'''
-from slicer.parameterNodeWrapper import parameterPack
-{importCodeForTypes(params, pipeline)}
-'''
-    code = f'''
-@parameterPack
-class {name}:'''.lstrip()
-
-    for param in params:
-        code += f"\n{tab}{param[2]}: {typeAsCode(pipeline.nodes[param]['datatype'])}"
-
-    return CodePiece(imports=cleanupImports(imports), code=code)
-
-
-def _createOnRunFunction(logicRunMethodName: str, pipeline: nx.DiGraph, tab: str=" "*4):
+def _createOnRunFunction(logicRunMethodName: str,
+                         pipeline: nx.DiGraph,
+                         parameterNodeOutputsPackName: str,
+                         tab: str):
     params, _ = getStep(0, pipeline)
     args = [f"{p[2]}=self._parameterNode.inputs.{p[2]}" for p in params]
     argsCode = textwrap.indent(",\n".join(args), tab * 2)
 
-    outputs, _ = getStep(-1, pipeline)
-    outputNames = [f"_ret_{outputNode[2]}" for outputNode in outputs]
-    outputNodeNames = [f"_ret_{outputNode[2]}" for outputNode in outputs if issubclass(unannotatedType(pipeline.nodes[outputNode]["datatype"]), vtkMRMLNode)]
-
-    outputFillCode = []
-    for outputNode in outputs:
-        if not issubclass(pipeline.nodes[outputNode]['datatype'], vtkMRMLNode):
-            outputFillCode.append(f"self._parameterNode.outputs.{outputNode[2]} = _ret_{outputNode[2]}")
-        else:
-            outputFillCode.append(f"self._parameterNode.outputs.{outputNode[2]}.CopyContent(_ret_{outputNode[2]})")
-    outputFillCode = "\n".join(outputFillCode)
-
-    outputMRMLNodeRemovalCode = "\n".join(f"slicer.mrmlScene.RemoveNode({name})" for name in outputNodeNames)
-
     code = f'''
 def _onRun(self):
-{tab}{", ".join(outputNames)} = self.logic.{logicRunMethodName}(
+{tab}outputValue = self.logic.{logicRunMethodName}(
 {argsCode},
-progress_callback=self.progressBar.getProgressCallback())
+{tab}{tab}progress_callback=self.progressBar.getProgressCallback())
 
-{textwrap.indent(outputFillCode, tab)}
+{tab}# Copy the output. Use CopyContent for nodes and do a normal copy for non-nodes.
+{tab}# For parameterPacks, need to recurse into them though so CopyContent can be used for
+{tab}# node members.
+{tab}if isinstance(outputValue, {parameterNodeOutputsPackName}):
+{tab}{tab}self._copyParameterPack(outputValue, self._parameterNode.outputs)
+{tab}elif isParameterPack(outputValue):
+{tab}{tab}# A parameter pack, but not the output one
+{tab}{tab}paramName = next(iter(self._parameterNode.outputs.allParameters.keys()))
+{tab}{tab}self._copyParameterPack(outputValue, self._parameterNode.outputs.getValue(paramName))
+{tab}elif isinstance(outputValue, vtkMRMLNode):
+{tab}{tab}# if the output is not a parameter pack, there is only one output
+{tab}{tab}paramName = next(iter(self._parameterNode.outputs.allParameters.keys()))
+{tab}{tab}self._parameterNode.outputs.getValue(paramName).CopyContent(outputValue)
+{tab}else:
+{tab}{tab}# single value that is not a node
+{tab}{tab}paramName = next(iter(self._parameterNode.outputs.allParameters.keys()))
+{tab}{tab}self._parameterNode.outputs.setValue(paramName, outputValue)
 
-{textwrap.indent(outputMRMLNodeRemovalCode, tab)}'''.strip()
+{tab}self._removeNodes(outputValue)
+'''.strip()
     return code
 
 def createWidget(name: str,
+                 parameterNodeClassName: str,
+                 parameterNodeOutputsClassName: str,
                  logicClassName: str,
                  logicRunMethodName: str,
                  pipeline: nx.DiGraph,
                  tab: str=" "*4) -> CodePiece:
 
-    inputsCode = createParameterPack(f"{name}Inputs", 0, pipeline, tab)
-    outputsCode = createParameterPack(f"{name}Outputs", -1, pipeline, tab)
-    onRunFunc = _createOnRunFunction(logicRunMethodName, pipeline)
+    onRunFunc = _createOnRunFunction(logicRunMethodName, pipeline, parameterNodeOutputsClassName, tab)
 
     # imports
-    imports = inputsCode.imports + "\n"
-    imports = outputsCode.imports + "\n"
-    imports += "from typing import Optional\n"
-    imports += "import qt\n"
-    imports += "import slicer\n"
-    imports += "from slicer.ScriptedLoadableModule import ScriptedLoadableModuleWidget\n"
-    imports += "from slicer.util import VTKObservationMixin\n"
-    imports += "from slicer.parameterNodeWrapper import createGui\n"
-    imports += "from slicer.parameterNodeWrapper import parameterNodeWrapper\n"
-    imports += "from Widgets.PipelineProgressBar import PipelineProgressBar\n"
+    imports = "\n".join([
+        "from typing import Optional",
+        "import qt",
+        "import slicer",
+        "from slicer import vtkMRMLNode",
+        "from slicer.ScriptedLoadableModule import ScriptedLoadableModuleWidget",
+        "from slicer.util import VTKObservationMixin",
+        "from slicer.parameterNodeWrapper import createGui",
+        "from slicer.parameterNodeWrapper import parameterNodeWrapper",
+        "from slicer.parameterNodeWrapper import isParameterPack",
+        "from Widgets.PipelineProgressBar import PipelineProgressBar",
+    ]) + "\n"
 
     # code
     code = f'''
-#
-# {name}Inputs
-#
-
-{inputsCode.code}
-
-
-#
-# {name}Outputs
-#
-
-{outputsCode.code}
-
-
-#
-# {name}ParameterNode
-#
-
-@parameterNodeWrapper
-class {name}ParameterNode:
-    inputs: {name}Inputs
-    outputs: {name}Outputs
-
-
 #
 # {name}Widget
 #
@@ -128,7 +91,7 @@ class {name}Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 {tab}def setup(self):
 {tab}{tab}ScriptedLoadableModuleWidget.setup(self)
 {tab}{tab}self.logic = {logicClassName}()
-{tab}{tab}self.paramWidget = createGui({name}ParameterNode)
+{tab}{tab}self.paramWidget = createGui({parameterNodeClassName})
 {tab}{tab}self.paramWidget.setMRMLScene(slicer.mrmlScene)
 {tab}{tab}self.runButton = qt.QPushButton("Run")
 {tab}{tab}self.progressBar = PipelineProgressBar()
@@ -192,9 +155,9 @@ class {name}Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 {tab}{tab}# Parameter node stores all user choices in parameter values, node selections, etc.
 {tab}{tab}# so that when the scene is saved and reloaded, these settings are restored.
 
-{tab}{tab}self.setParameterNode({name}ParameterNode(self.logic.getParameterNode()))
+{tab}{tab}self.setParameterNode({parameterNodeClassName}(self.logic.getParameterNode()))
 
-{tab}def setParameterNode(self, inputParameterNode: Optional[{name}ParameterNode]) -> None:
+{tab}def setParameterNode(self, inputParameterNode: Optional[{parameterNodeClassName}]) -> None:
 {tab}{tab}"""
 {tab}{tab}Set and observe parameter node.
 {tab}{tab}Observation is needed because when the parameter node is changed then the GUI must be updated immediately.
@@ -205,6 +168,22 @@ class {name}Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 {tab}{tab}self._parameterNode = inputParameterNode
 {tab}{tab}if self._parameterNode:
 {tab}{tab}{tab}self._parameterNodeGuiTag = self._parameterNode.connectGui(self.paramWidget)
+
+{tab}def _copyParameterPack(self, from_, to):
+{tab}{tab}for paramName in from_.allParameters:
+{tab}{tab}{tab}if isinstance(from_.getValue(paramName), vtkMRMLNode):
+{tab}{tab}{tab}{tab}to.getValue(paramName).CopyContent(from_.getValue(paramName))
+{tab}{tab}{tab}elif isParameterPack(from_.getValue(paramName)):
+{tab}{tab}{tab}{tab}self._copyParameterPack(from_.getValue(paramName), to.getValue(paramName))
+{tab}{tab}{tab}else:
+{tab}{tab}{tab}{tab}to.setValue(paramName, from_.getValue(paramName))
+
+{tab}def _removeNodes(self, item):
+{tab}{tab}if isinstance(item, vtkMRMLNode):
+{tab}{tab}{tab}slicer.mrmlScene.RemoveNode(item)
+{tab}{tab}elif isParameterPack(item):
+{tab}{tab}{tab}for paramName in item.allParameters.keys():
+{tab}{tab}{tab}{tab}self._removeNodes(item.getValue(paramName))
 
 {textwrap.indent(onRunFunc, tab)}
 '''.lstrip()

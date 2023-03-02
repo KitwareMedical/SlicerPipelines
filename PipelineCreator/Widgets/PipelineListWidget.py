@@ -14,6 +14,7 @@ from slicer.parameterNodeWrapper import (
     createGui,
     createGuiConnector,
     findFirstAnnotation,
+    isParameterPack,
     splitAnnotations,
     unannotatedType,
 
@@ -590,9 +591,14 @@ class PipelineStepWidget(qt.QWidget):
         """
         The intermediate output values for this step.
         """
-        return [
-            Reference(self, 0, self.stepNumber, self.stepInfo.name, "return", unannotatedType(self.stepInfo.returnType))
-        ]
+        returnType = unannotatedType(self.stepInfo.returnType)
+        outputs = [Reference(self, 0, self.stepNumber, self.stepInfo.name, "return", returnType)]
+        if isParameterPack(returnType):
+            outputs += [
+                Reference(self, index + 1, self.stepNumber, self.stepInfo.name, f"return.{paramName}", unannotatedType(paramInfo.unalteredType))
+                for index, (paramName, paramInfo) in enumerate(returnType.allParameters.items())
+            ]
+        return outputs
 
     @property
     def stepNumber(self) -> int:
@@ -602,7 +608,6 @@ class PipelineStepWidget(qt.QWidget):
     def stepNumber(self, num: int) -> None:
         self._stepNumber = num
         self._collapsibleButton.text = f"Step {self._stepNumber} - {self.stepInfo.name}"
-        self._updateOutputNames()
 
     def updateInputReferences(self, inputReferences) -> None:
         for referenceCombobox in self._inputReferences:
@@ -671,14 +676,13 @@ class PipelineStepWidget(qt.QWidget):
 
         unannotatedReturnType = unannotatedType(self.stepInfo.returnType)
 
-        #TODO: possibly break apart returned tuples or parameterPacks
+        grid.addWidget(qt.QLabel("return"), 0, 0)
         grid.addWidget(qt.QLabel(f"({unannotatedReturnType.__name__})"), 0, 1)
-        self._returnNameWidget = qt.QLabel("")
-        grid.addWidget(self._returnNameWidget, 0, 0)
-        self._updateOutputNames()
 
-    def _updateOutputNames(self) -> None:
-        self._returnNameWidget.text = f"step{self.stepNumber}_{self.stepInfo.name}_return"
+        if isParameterPack(unannotatedReturnType):
+             for index, (paramName, paramInfo) in enumerate(unannotatedReturnType.allParameters.items()):
+                 grid.addWidget(qt.QLabel(f"return.{paramName}"), index + 1, 0)
+                 grid.addWidget(qt.QLabel(f"({unannotatedType(paramInfo.unalteredType).__name__})"), index + 1, 1)
 
 
 class PipelineListWidget(qt.QWidget):

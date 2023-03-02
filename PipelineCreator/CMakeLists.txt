@@ -16,6 +16,7 @@ set(MODULE_PYTHON_SCRIPTS
   _${MODULE_NAME}/PipelineCreation/CodeGeneration/cmakelists.py
   _${MODULE_NAME}/PipelineCreation/CodeGeneration/logic.py
   _${MODULE_NAME}/PipelineCreation/CodeGeneration/module.py
+  _${MODULE_NAME}/PipelineCreation/CodeGeneration/parameterNode.py
   _${MODULE_NAME}/PipelineCreation/CodeGeneration/util.py
   _${MODULE_NAME}/PipelineCreation/CodeGeneration/widget.py
 

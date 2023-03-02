@@ -46,7 +46,7 @@ def _validateStepPipelineNames(pipeline: nx.DiGraph, registeredPipelines: dict[s
             raise ValueError("The top level and bottom of the pipeline (the overall inputs and outputs of the"
                              " pipeline) are expected have 'None' for the pipelineName")
         elif stepNum not in (0, lastStep) and pipelineName not in registeredPipelines:
-            raise ValueError("Steps > 1 must have a valid pipeline name")
+            raise ValueError(f"Steps > 1 must have a valid pipeline name:\n  '{pipelineName}' is not registered")
 
 
 def _validateNoSkippedSteps(pipeline: nx.DiGraph) -> None:
@@ -100,7 +100,7 @@ def _validateConnectionDataTypes(pipeline: nx.DiGraph) -> None:
         if fromType == int and toType == float:
             pass # allow going from int to float
         elif not issubclass(fromType, toType):
-            raise TypeError(f"Cannot connect from type '{fromType}' to type '{toType}'")
+            raise TypeError(f"Cannot connect from type '{fromType}' to type '{toType}' for nodes {fromKey} to {toKey}")
 
 
 def validatePipeline(pipeline: nx.DiGraph, registeredPipelines: dict[str, PipelineInfo]) -> None:
