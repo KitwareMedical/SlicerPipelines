@@ -80,12 +80,15 @@ def fillInDataTypes(pipeline: nx.DiGraph, registeredPipelines: dict[str, Pipelin
         if pipelineName is not None:
             info = registeredPipelines[pipelineName]
             if isReturnParam(paramName):
-                #TODO: update for return of parameterPack
-                datatype = unannotatedType(info.returnType)
+                if '.' in paramName:
+                    # piece of a parameter pack
+                    datatype = unannotatedType(unannotatedType(info.returnType).dataType(paramName.split('.', maxsplit=1)[1]))
+                else:
+                    datatype = unannotatedType(info.returnType)
             else:
                 datatype = unannotatedType(info.parameters[paramName])
             if "datatype" in attributes and attributes["datatype"] != datatype:
-                raise TypeError("Found specified datatype that does not match known datatype")
+                raise TypeError(f"Found specified datatype that does not match known datatype\n  {attributes['datatype']} vs {datatype}")
             attributes["datatype"] = datatype
 
 

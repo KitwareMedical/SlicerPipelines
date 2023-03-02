@@ -1,7 +1,9 @@
+import itertools
 import networkx as nx
 import pickle
 import re
 import textwrap
+from typing import Union
 
 from MRMLCorePython import vtkMRMLNode
 
@@ -26,20 +28,22 @@ from _PipelineCreator.PipelineCreation.CodeGeneration.util import (
 __all__ = ["createLogic"]
 
 
-def _getReturnType(lastStepNodes, fullPipeline):
+def _getReturnType(lastStepNodes, fullPipeline, compositeReturnTypeClassName):
     assert len(lastStepNodes) != 0
     if len(lastStepNodes) == 1:
         return fullPipeline.nodes[lastStepNodes[0]]['datatype']
     else:
-        raise NotImplementedError("Need to implement multiple return type")
+        return compositeReturnTypeClassName
 
 
-def _makeToplevelFunctionSignature(functionName, fullPipeline, returnType) -> str:
-    returnTypeCode = typeAsCode(returnType)
+def _makeToplevelFunctionSignature(functionName, fullPipeline, returnType: Union[str, type]) -> str:
+    returnTypeCode = returnType if isinstance(returnType, str) else typeAsCode(returnType)
     params, _ = getStep(0, fullPipeline)
     parameterString = ", ".join(f"{param[2]}: {typeAsCode(fullPipeline.nodes[param]['datatype'])}"
                                 for param in params)
-    necessaryImports = "from PipelineCreator import PipelineProgressCallback\n" + importCodeForType(returnType) + "\n" + importCodeForTypes(params, fullPipeline)
+    necessaryImports = "from PipelineCreator import PipelineProgressCallback\n" + importCodeForTypes(params, fullPipeline)
+    if not isinstance(returnType, str):
+        necessaryImports += "\n" + importCodeForType(returnType)
     return f"{functionName}({parameterString}, *, progress_callback=PipelineProgressCallback(), delete_intermediate_nodes=True) -> {returnTypeCode}", necessaryImports
 
 
@@ -51,9 +55,10 @@ def _varName(node) -> str:
     else:
         # step_{step#}_{pipelineName}_{paramName}
         # e.g. step_1_cleanPolyData_return
-        # (dots are replaced with underscores, only applicable for "return.subitem")
+        #      step_1_somePipe_return.packSubItem
         cleanedPipelineName = _cleanPipelineName(node=node)
-        return f"step_{node[0]}_{cleanedPipelineName}_{node[2].replace('.', '_')}"
+        # note: node[2] could have a . to get at a subitem
+        return f"step_{node[0]}_{cleanedPipelineName}_{node[2]}"
 
 
 def _cleanPipelineName(step=None, node=None):
@@ -106,7 +111,10 @@ def _generateStepCode(step, pipeline: nx.DiGraph, registeredPipelines: dict[str,
     ]
     stepArgumentsCode = textwrap.indent(",\n".join(stepArguments), tab)
 
-    returnVariables = _returnVarNames(returns)
+    # get the returns, but filter out anything that is a break down of a parameterPack
+    returnVariables = [r for r in _returnVarNames(returns) if not '.' in r]
+    if len(returnVariables) != 1:
+        raise RuntimeError(f"Unexpected number of returns: {returnVariables}")
 
     stepFunctionName = _stepFunctionName(step)
     stepFunctionValue = _stepFunctionValue(step, registeredPipelines)
@@ -120,7 +128,7 @@ def _generateStepCode(step, pipeline: nx.DiGraph, registeredPipelines: dict[str,
     stepCode = f"""# step {step[0][0]} - {step[0][1]}
 progress_callback.reportProgress("{step[0][1]}", 0, {step[0][0] - 1}, {numSteps})
 {stepFunctionName} = {stepFunctionValue}
-{", ".join(returnVariables)} = {stepFunctionName}(
+{returnVariables[0]} = {stepFunctionName}(
 {stepArgumentsCode}{progressStr})
 """
     return stepCode
@@ -130,8 +138,23 @@ def _getReturnedVariables(lastStep, pipeline: nx.DiGraph):
     return [_getInput(n, pipeline) for n in lastStep]
 
 
-def _generateReturnStatement(lastStep, pipeline: nx.DiGraph) -> str:
-    return "return " + ", ".join(_getReturnedVariables(lastStep, pipeline))
+def _generateReturnStatement(lastStep, pipeline: nx.DiGraph, compositeReturnClassName: str) -> str:
+    if len(lastStep) == 1:
+        return f"return {_getReturnedVariables(lastStep, pipeline)[0]}"
+    else:
+        lastStep.sort(key=lambda node: pipeline.nodes[node]["position"])
+        args = ", ".join(_getReturnedVariables(lastStep, pipeline))
+        return f"return {compositeReturnClassName}({args})"
+
+
+def _isPartOfReturn(name, returnVars):
+    if name in returnVars:
+        return True
+    if name.split('.')[0] in returnVars:
+        return True
+    if name in [r.split('.')[0] for r in returnVars]:
+        return True
+    return False
 
 
 def _getNamesOfMRMLNodeIntermediates(pipeline: nx.DiGraph):
@@ -144,26 +167,45 @@ def _getNamesOfMRMLNodeIntermediates(pipeline: nx.DiGraph):
 
     # remove returned variables, so we only have intermediates
     returnVars = _getReturnedVariables(steps[-1], pipeline)
-    return [m for m in mrmlReturnNames if m not in returnVars]
+    intermediates = [m for m in mrmlReturnNames if not _isPartOfReturn(m, returnVars)]
+
+    # reduce parameterPack items to just the top level pack
+    notInAContainer = [m for m in intermediates if not '.' in m]
+    inAContainer = [m for m in intermediates if '.' in m]
+    return notInAContainer, inAContainer
+
+
+def _generateDeleteIntermediatesCode(pipeline: nx.DiGraph, tab: str):
+    intermediateMRMLNodesNotInContainer, intermediateMRMLNodesInContainer = _getNamesOfMRMLNodeIntermediates(pipeline)
+    intermediateContainers = list(set(m.split(".")[0] for m in intermediateMRMLNodesInContainer))
+
+    declaration = "\n".join(f"{name} = None" for name in itertools.chain(intermediateMRMLNodesNotInContainer, intermediateContainers))
+
+    deletion = "\n".join(f"slicer.mrmlScene.RemoveNode({name})" for name in intermediateMRMLNodesNotInContainer)
+    for i in intermediateMRMLNodesInContainer:
+        container = i.split(".")[0]
+        deletion += f"\nif {container} is not None:\n{tab}slicer.mrmlScene.RemoveNode({i})"
+
+    deletion = deletion or "pass"  # if empty, explicitly call pass
+
+    return declaration, deletion
 
 
 def _generateRunFunction(pipeline: nx.DiGraph,
                          registeredPipelines: dict[str, PipelineInfo],
                          runFunctionName: str,
+                         compositeReturnTypeClassName: str,
                          tab: str) -> tuple[str, str]:
     """
     Returns (function-code, necessary-imports)
     """
     steps = groupNodesByStep(pipeline)
-    returnType = _getReturnType(steps[-1], pipeline)
+    returnType = _getReturnType(steps[-1], pipeline, compositeReturnTypeClassName)
     functionSignature, necessaryImports = _makeToplevelFunctionSignature(runFunctionName, pipeline, returnType)
     body = "\n".join(_generateStepCode(step, pipeline, registeredPipelines, len(steps) - 2, tab) for step in steps[1:-1])
-    returnStatement = _generateReturnStatement(steps[-1], pipeline)
+    returnStatement = _generateReturnStatement(steps[-1], pipeline, compositeReturnTypeClassName)
 
-    intermediateMRMLNodes = _getNamesOfMRMLNodeIntermediates(pipeline)
-    intermediateMRMLNodesDeclaration = "\n".join(f"{name} = None" for name in intermediateMRMLNodes)
-    intermediateMRMLNodesDeletion = "\n".join(f"slicer.mrmlScene.RemoveNode({name})" for name in intermediateMRMLNodes)
-    intermediateMRMLNodesDeletion = intermediateMRMLNodesDeletion or "pass"  # if empty, explicitly call pass
+    intermediateMRMLNodesDeclaration, intermediateMRMLNodesDeletion = _generateDeleteIntermediatesCode(pipeline, tab)
 
     numSteps = max(1, len(steps) - 2)
 
@@ -173,7 +215,7 @@ def _generateRunFunction(pipeline: nx.DiGraph,
     #       Not sure if this really ever useful, but it is easy to support.
     code = f"""def {functionSignature}:
 {tab}progress_callback.reportProgress("", 0, 0, {numSteps})
-{tab}# declare needed variables so they exist in the except clause
+{tab}# declare needed variables so they exist in the finally clause
 {textwrap.indent(intermediateMRMLNodesDeclaration, tab)}
 
 {tab}try:
@@ -193,6 +235,7 @@ def _generateRunFunction(pipeline: nx.DiGraph,
 def createLogic(name: str,
                 pipeline: nx.DiGraph,
                 registeredPipelines: dict[str, PipelineInfo],
+                parameterNodeOutputsName: str,
                 runFunctionName: str="run",
                 tab: str = " " * 4) -> CodePiece:
     """
@@ -200,7 +243,7 @@ def createLogic(name: str,
 
     Returns a string which is the python code for the module logic.
     """
-    runFunctionCode, runFunctionImports = _generateRunFunction(pipeline, registeredPipelines, runFunctionName, tab)
+    runFunctionCode, runFunctionImports = _generateRunFunction(pipeline, registeredPipelines, runFunctionName, parameterNodeOutputsName, tab)
 
     constantImports = """
 import pickle
@@ -208,7 +251,6 @@ import slicer
 from slicer.ScriptedLoadableModule import ScriptedLoadableModuleLogic
 """.lstrip()
     allImports = cleanupImports(constantImports + runFunctionImports)
-
 
     logicCode = f"""#
 # {name}
