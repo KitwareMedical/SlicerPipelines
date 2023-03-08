@@ -2,8 +2,6 @@ import textwrap
 
 import networkx as nx
 
-from MRMLCorePython import vtkMRMLNode
-
 from _PipelineCreator.PipelineCreation.CodeGeneration.util import CodePiece
 
 from _PipelineCreator.PipelineCreation.util import (
@@ -41,7 +39,7 @@ def _onRun(self):
 {tab}elif isinstance(outputValue, vtkMRMLNode):
 {tab}{tab}# if the output is not a parameter pack, there is only one output
 {tab}{tab}paramName = next(iter(self._parameterNode.outputs.allParameters.keys()))
-{tab}{tab}self._parameterNode.outputs.getValue(paramName).CopyContent(outputValue)
+{tab}{tab}self._copyNode(outputValue, self._parameterNode.outputs.getValue(paramName))
 {tab}else:
 {tab}{tab}# single value that is not a node
 {tab}{tab}paramName = next(iter(self._parameterNode.outputs.allParameters.keys()))
@@ -169,10 +167,29 @@ class {name}Widget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 {tab}{tab}if self._parameterNode:
 {tab}{tab}{tab}self._parameterNodeGuiTag = self._parameterNode.connectGui(self.paramWidget)
 
+{tab}def _copyNode(self, src, dest):
+{tab}{tab}# Clones src into dest, but keeps dest's display and storage nodes, if any
+{tab}{tab}# If neither src nor dest has display nodes, the default are created
+{tab}{tab}if src is not None and dest is not None:
+{tab}{tab}{tab}name = dest.GetName()
+{tab}{tab}{tab}if dest.IsA('vtkMRMLDisplayableNode'):
+{tab}{tab}{tab}{tab}displayNodesIDs = [dest.GetNthDisplayNodeID(n) for n in range(dest.GetNumberOfDisplayNodes())]
+{tab}{tab}{tab}{tab}storageNodesIDs = [dest.GetNthStorageNodeID(n) for n in range(dest.GetNumberOfStorageNodes())]
+
+{tab}{tab}{tab}dest.Copy(src)
+{tab}{tab}{tab}dest.SetName(name)
+
+{tab}{tab}{tab}if dest.IsA('vtkMRMLDisplayableNode'):
+{tab}{tab}{tab}{tab}dest.RemoveAllDisplayNodeIDs()
+{tab}{tab}{tab}{tab}for n, displayNodeID in enumerate(displayNodesIDs):
+{tab}{tab}{tab}{tab}{tab}dest.SetAndObserveNthDisplayNodeID(n, displayNodeID)
+{tab}{tab}{tab}{tab}for n, storageNodeID in enumerate(storageNodesIDs):
+{tab}{tab}{tab}{tab}{tab}dest.SetAndObserveNthStorageNodeID(n, storageNodeID)
+
 {tab}def _copyParameterPack(self, from_, to):
 {tab}{tab}for paramName in from_.allParameters:
 {tab}{tab}{tab}if isinstance(from_.getValue(paramName), vtkMRMLNode):
-{tab}{tab}{tab}{tab}to.getValue(paramName).CopyContent(from_.getValue(paramName))
+{tab}{tab}{tab}{tab}self._copyNode(from_.getValue(paramName), to.getValue(paramName))
 {tab}{tab}{tab}elif isParameterPack(from_.getValue(paramName)):
 {tab}{tab}{tab}{tab}self._copyParameterPack(from_.getValue(paramName), to.getValue(paramName))
 {tab}{tab}{tab}else:

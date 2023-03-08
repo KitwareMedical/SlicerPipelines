@@ -23,13 +23,13 @@ from slicer.parameterNodeWrapper import (
     WithinRange,
 )
 
-from MRMLCorePython import (
+from slicer import (
     vtkMRMLModelNode,
     vtkMRMLScalarVolumeNode,
     vtkMRMLSegmentationNode,
 )
 
-from PipelineCreator import PipelineCreatorWidget, PipelineCreatorLogic
+from PipelineCreator import PipelineCreatorLogic
 from _PipelineCreator import PipelineCreation
 
 class TempPythonModule:
@@ -1054,9 +1054,6 @@ class PipelineCreatorFullTests(unittest.TestCase):
                 pipeline=pipeline,
             )
 
-            with open(os.path.join(tempDir, f"{moduleName}.py")) as f:
-                print(f.read())
-
             # test loading the new slicer module
             factory = slicer.app.moduleManager().factoryManager()
             factory.registerModule(qt.QFileInfo(os.path.join(tempDir, moduleName + ".py")))
@@ -1085,9 +1082,98 @@ class PipelineCreatorFullTests(unittest.TestCase):
             widget.runButton.click()
 
             self.assertEqual(outputSeg.GetSegmentation().GetNumberOfSegments(), 1)
+            # TODO: Enable this line once reference propagation is fixed
+            # self.assertEqual(outputSeg.GetNodeReference(outputSeg.GetReferenceImageGeometryReferenceRole()), outputVol)
 
             # make sure there are no intermediate results hanging.
             # note: we gave an output node so there should be _no_ new nodes
             self.assertEqual(slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode"), numModels)
             self.assertEqual(slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLSegmentationNode"), numSegs)
             self.assertEqual(slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLScalarVolumeNode"), numVols)
+
+    def test_the_whole_shebang_keep_referenced_nodes(self):
+        slicer.mrmlScene.Clear()
+
+        pipeline = nx.DiGraph(name="Multi output")
+
+        # structure - None means overall input/output levels
+        pipeline.add_node((0, None, "mesh"), datatype=vtkMRMLModelNode, position=0)
+
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "model"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "spacingX"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "spacingY"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "spacingZ"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "marginX"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "marginY"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "marginZ"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "return"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "return.segmentation"))
+        pipeline.add_node((1, "exportModelToSegmentationSpacing", "return.referenceVolume"))
+
+        pipeline.add_node((2, None, "segmentation"), datatype=vtkMRMLSegmentationNode)
+
+        # connectivity
+        numNodes = len(pipeline.nodes)
+        pipeline.add_edges_from([
+            # connections into step 1
+            ((0, None, "mesh"),           (1, "exportModelToSegmentationSpacing", "model")),
+            # final output
+            ((1, "exportModelToSegmentationSpacing", "return.segmentation"),  (2, None, "segmentation")),
+        ])
+        assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
+
+        # fixed values
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "spacingX")]["fixed_value"] = 0.1
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "spacingY")]["fixed_value"] = 0.1
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "spacingZ")]["fixed_value"] = 0.1
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "marginX")]["fixed_value"] = 1
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "marginY")]["fixed_value"] = 1
+        pipeline.nodes[(1, "exportModelToSegmentationSpacing", "marginZ")]["fixed_value"] = 1
+
+        moduleName = "PipelineCreatorTestModuleKeepReferencedNodes"
+
+        with tempfile.TemporaryDirectory() as tempDir:
+            # Make output
+            self.logic.createPipeline(
+                name=moduleName,
+                outputDirectory=tempDir,
+                pipeline=pipeline,
+            )
+
+            with open(os.path.join(tempDir, f"{moduleName}.py")) as f:
+                print(f.read())
+
+            # test loading the new slicer module
+            factory = slicer.app.moduleManager().factoryManager()
+            factory.registerModule(qt.QFileInfo(os.path.join(tempDir, moduleName + ".py")))
+            factory.loadModules([moduleName])
+
+            slicer.util.selectModule(moduleName)
+
+            widget = slicer.modules.PipelineCreatorTestModuleKeepReferencedNodesWidget
+
+            model = makeSphereModel(self)
+            outputSeg = slicer.mrmlScene.AddNewNodeByClass("vtkMRMLSegmentationNode")
+
+            numModels = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
+            numSegs = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLSegmentationNode")
+            numVols = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLScalarVolumeNode")
+
+            meshWidget = findChildWidgetForParameter(widget.paramWidget, "inputs.mesh")
+            outputSegWidget = findChildWidgetForParameter(widget.paramWidget, "outputs.segmentation")
+
+            meshWidget.setCurrentNode(model)
+            outputSegWidget.setCurrentNode(outputSeg)
+
+            widget.runButton.click()
+
+            self.assertEqual(outputSeg.GetSegmentation().GetNumberOfSegments(), 1)
+
+            self.assertIsNotNone(outputSeg.GetNodeReference(outputSeg.GetReferenceImageGeometryReferenceRole()))
+
+            # make sure there are no intermediate results hanging.
+            # note: we gave an output node so there should be _no_ new nodes
+            self.assertEqual(slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode"), numModels)
+            self.assertEqual(slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLSegmentationNode"), numSegs)
+            # should have 1 more volume than before
+            self.assertEqual(slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLScalarVolumeNode"), numVols + 1)
