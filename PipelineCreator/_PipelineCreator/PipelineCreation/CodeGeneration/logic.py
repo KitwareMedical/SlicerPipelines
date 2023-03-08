@@ -5,7 +5,7 @@ import re
 import textwrap
 from typing import Union
 
-from MRMLCorePython import vtkMRMLNode
+import slicer
 
 from slicer.parameterNodeWrapper import unannotatedType
 
@@ -112,7 +112,7 @@ def _generateStepCode(step, pipeline: nx.DiGraph, registeredPipelines: dict[str,
     stepArgumentsCode = textwrap.indent(",\n".join(stepArguments), tab)
 
     # get the returns, but filter out anything that is a break down of a parameterPack
-    returnVariables = [r for r in _returnVarNames(returns) if not '.' in r]
+    returnVariables = list(set([r.split('.')[0] for r in _returnVarNames(returns)]))
     if len(returnVariables) != 1:
         raise RuntimeError(f"Unexpected number of returns: {returnVariables}")
 
@@ -157,34 +157,39 @@ def _isPartOfReturn(name, returnVars):
     return False
 
 
-def _getNamesOfMRMLNodeIntermediates(pipeline: nx.DiGraph):
+def _splitIntermediatesFromReturns(pipeline: nx.DiGraph):
     steps = groupNodesByStep(pipeline)
     mrmlReturnNames = []
     for step in steps:
         _, returns = splitParametersFromReturn(step)
-        mrmlReturns = [ret for ret in returns if issubclass(unannotatedType(pipeline.nodes[ret]["datatype"]), vtkMRMLNode)]
+        mrmlReturns = [ret for ret in returns if issubclass(unannotatedType(pipeline.nodes[ret]["datatype"]), slicer.vtkMRMLNode)]
         mrmlReturnNames += _returnVarNames(mrmlReturns)
 
     # remove returned variables, so we only have intermediates
     returnVars = _getReturnedVariables(steps[-1], pipeline)
     intermediates = [m for m in mrmlReturnNames if not _isPartOfReturn(m, returnVars)]
+    trueReturns = [m for m in mrmlReturnNames if _isPartOfReturn(m, returnVars)]
 
     # reduce parameterPack items to just the top level pack
     notInAContainer = [m for m in intermediates if not '.' in m]
     inAContainer = [m for m in intermediates if '.' in m]
-    return notInAContainer, inAContainer
+    return notInAContainer, inAContainer, trueReturns
 
 
 def _generateDeleteIntermediatesCode(pipeline: nx.DiGraph, tab: str):
-    intermediateMRMLNodesNotInContainer, intermediateMRMLNodesInContainer = _getNamesOfMRMLNodeIntermediates(pipeline)
+    intermediateMRMLNodesNotInContainer, intermediateMRMLNodesInContainer, trueReturns = _splitIntermediatesFromReturns(pipeline)
     intermediateContainers = list(set(m.split(".")[0] for m in intermediateMRMLNodesInContainer))
 
-    declaration = "\n".join(f"{name} = None" for name in itertools.chain(intermediateMRMLNodesNotInContainer, intermediateContainers))
+    declaration = '\n'.join([f"{name} = None"
+                             for name in itertools.chain(intermediateMRMLNodesNotInContainer, intermediateContainers, trueReturns)
+                             if not '.' in name])
 
-    deletion = "\n".join(f"slicer.mrmlScene.RemoveNode({name})" for name in intermediateMRMLNodesNotInContainer)
+
+    deletion = f"trueReturns = [{','.join(trueReturns)}]\n" 
+    deletion += "\n".join(f"slicer.mrmlScene.RemoveNode({name})" for name in intermediateMRMLNodesNotInContainer)
     for i in intermediateMRMLNodesInContainer:
         container = i.split(".")[0]
-        deletion += f"\nif {container} is not None:\n{tab}slicer.mrmlScene.RemoveNode({i})"
+        deletion += f"\nif {container} is not None and not _nodeReferencedBy({i}, trueReturns):\n{tab}slicer.mrmlScene.RemoveNode({i})"
 
     deletion = deletion or "pass"  # if empty, explicitly call pass
 
@@ -255,6 +260,16 @@ from slicer.ScriptedLoadableModule import ScriptedLoadableModuleLogic
     logicCode = f"""#
 # {name}
 #
+
+def _nodeReferencedBy(node, listOfNodes):
+{tab}for option in listOfNodes:
+{tab}{tab}if option is not None:
+{tab}{tab}{tab}roles = []
+{tab}{tab}{tab}option.GetNodeReferenceRoles(roles)
+{tab}{tab}{tab}for role in roles:
+{tab}{tab}{tab}{tab}if option.HasNodeReferenceID(role, node.GetID()):
+{tab}{tab}{tab}{tab}{tab}return True
+{tab}return False
 
 class {name}(ScriptedLoadableModuleLogic):
 {tab}def __init__(self):

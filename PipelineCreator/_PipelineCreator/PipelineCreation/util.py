@@ -6,7 +6,6 @@ import typing
 import networkx as nx
 
 from slicer.parameterNodeWrapper import unannotatedType
-from MRMLCorePython import vtkMRMLNode
 
 from _PipelineCreator.PipelineRegistrar import PipelineInfo
 
