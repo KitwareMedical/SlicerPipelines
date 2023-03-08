@@ -12,7 +12,7 @@ from slicer.parameterNodeWrapper import (
     SingleStep,
 )
 
-from MRMLCorePython import (
+from slicer import (
     vtkMRMLLabelMapVolumeNode,
     vtkMRMLModelNode,
     vtkMRMLScalarVolumeNode,

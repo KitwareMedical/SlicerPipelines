@@ -6,7 +6,9 @@ set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
 
   _${MODULE_NAME}/SegmentationsWrapping.py
+  _${MODULE_NAME}/SegmentEditorWrapping.py
   _${MODULE_NAME}/SurfaceToolboxWrapping.py
+  _${MODULE_NAME}/vtkWrapping.py
   )
 
 set(MODULE_PYTHON_RESOURCES

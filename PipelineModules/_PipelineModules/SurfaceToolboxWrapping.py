@@ -8,7 +8,7 @@ from slicer.parameterNodeWrapper import (
     SingleStep,
     WithinRange,
 )
-from MRMLCorePython import vtkMRMLModelNode
+from slicer import vtkMRMLModelNode
 
 from PipelineCreator import slicerPipeline
 from SurfaceToolbox import SurfaceToolboxLogic
