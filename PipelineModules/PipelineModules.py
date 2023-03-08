@@ -23,11 +23,9 @@ class PipelineModules(ScriptedLoadableModule):
         self.parent.categories = ["Pipelines.Advanced"]
         self.parent.dependencies = ["PipelineCreator", "SegmentEditor", "Segmentations"]
         self.parent.contributors = ["Connor Bowley (Kitware, Inc.)"]
-        # TODO: update with short description of the module and a link to online module documentation
         self.parent.helpText = """
 This module exists to create pipelines for the PipelineCreator to use.
 """
-        # TODO: replace with organization, grant and thanks
         self.parent.acknowledgementText = "This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT."
         self.parent.hidden = True
 
