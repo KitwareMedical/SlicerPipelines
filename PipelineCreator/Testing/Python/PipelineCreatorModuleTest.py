@@ -24,6 +24,7 @@ from slicer.parameterNodeWrapper import (
 )
 
 from slicer import (
+    vtkMRMLLabelMapVolumeNode,
     vtkMRMLModelNode,
     vtkMRMLScalarVolumeNode,
     vtkMRMLSegmentationNode,
@@ -141,6 +142,9 @@ def exportModelToSegmentationSpacing(model: vtkMRMLModelNode,
 class _SomeClass:
     pass
 
+def passThruScalarVolume(volume: vtkMRMLScalarVolumeNode) -> vtkMRMLScalarVolumeNode:
+    # note: don't actually do this in a pipeline
+    return volume
 
 # simple items with implementation to test the logic's composition
 def add(a: int, b: int) -> int:
@@ -383,6 +387,7 @@ class PipelineCreatorValidationTest(unittest.TestCase):
         self.logic.registerPipeline("centerOfX", centerOfX, [])
         self.logic.registerPipeline("decimation", decimation, [])
         self.logic.registerPipeline("translate", translate, [])
+        self.logic.registerPipeline("passThruScalarVolume", passThruScalarVolume, [])
 
     def test_pipeline_validation_fail_if_empty(self):
         with self.assertRaises(ValueError):
@@ -431,6 +436,28 @@ class PipelineCreatorValidationTest(unittest.TestCase):
 
     def test_pipeline_validation_standard_pass(self):
         pipeline = self._makeDefaultTestPipeline()
+        PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
+
+    def test_pipeline_validation_upcast(self):
+        pipeline = nx.DiGraph()
+
+        # structure - None means overall input/output levels
+        pipeline.add_node((0, None, "labelmap"), datatype=vtkMRMLLabelMapVolumeNode, position=0)
+
+        pipeline.add_node((1, "passThruScalarVolume", "volume"))
+        pipeline.add_node((1, "passThruScalarVolume", "return"))
+
+        pipeline.add_node((2, None, "scalarVolume"), datatype=vtkMRMLScalarVolumeNode, position=0)
+
+        numNodes = len(pipeline.nodes)
+        pipeline.add_edges_from([
+            # connections into step 1
+            ((0, None, "labelmap"),                 (1, "passThruScalarVolume", "volume")),
+            # final output
+            ((1, "passThruScalarVolume", "return"), (2, None, "scalarVolume"))
+        ])
+        assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
+
         PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
 
     def test_pipeline_validation_fail_no_datatype_on_step0(self):

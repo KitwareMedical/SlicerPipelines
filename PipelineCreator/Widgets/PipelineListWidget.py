@@ -106,7 +106,7 @@ class ReferenceComboBox(qt.QWidget):
         if unannotatedParamType == type(None):
             self._inputReferences = [None] + references
         else:
-            self._inputReferences = [None] + [r for r in references if unannotatedParamType == r.type]
+            self._inputReferences = [None] + [r for r in references if issubclass(r.type, unannotatedParamType)]
 
         self._combobox.clear()
         self._combobox.addItem("")
