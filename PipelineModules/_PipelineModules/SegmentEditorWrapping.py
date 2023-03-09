@@ -22,7 +22,7 @@ class SegmentEditorHelper:
         self.segmentEditorWidget.setMRMLSegmentEditorNode(self.segmentEditorNode)
         self.segmentEditorWidget.setMRMLScene(slicer.mrmlScene)
         self.effectName = effectName
-        self.effect = self.segmentEditorWidget.effectByName(self.effectName)
+        self.effectParameters = {}
 
     def __del__(self):
         self.segmentEditorWidget.setMRMLScene(None)
@@ -40,6 +40,8 @@ class SegmentEditorHelper:
         self.segmentEditorWidget.setSegmentationNode(inputSeg)
         #important we set the segmentation node before the active effect name
         self.segmentEditorWidget.setActiveEffectByName(self.effectName)
+        for name, value in self.effectParameters.items():
+            self.segmentEditorWidget.activeEffect().setParameter(name, value)
         self.segmentEditorWidget.activeEffect().self().onApply()
         return inputSeg
 
@@ -57,8 +59,10 @@ def smoothing(segmentation: slicer.vtkMRMLSegmentationNode,
               method: SmoothingMethod,
               kernelSize: Annotated[int, Minimum(0), Default(3)]) -> slicer.vtkMRMLSegmentationNode:
     helper = SegmentEditorHelper("Smoothing")
-    helper.effect.setParameter("SmoothingMethod", method.value)
-    helper.effect.setParameter("KernelSizeMm", kernelSize)
+    helper.effectParameters = {
+        "SmoothingMethod": method.value,
+        "KernelSizeMm": kernelSize,
+    }
     return helper.run(segmentation)
 
 
@@ -72,7 +76,9 @@ def margin(segmentation: slicer.vtkMRMLSegmentationNode,
            method: MarginMethod,
            marginSize: Annotated[float, Minimum(0), Default(2), Decimals(2), SingleStep(0.01)]) -> slicer.vtkMRMLSegmentationNode:
     helper = SegmentEditorHelper("Margin")
-    helper.effect.setParameter("MarginSizeMm", marginSize if method == MarginMethod.Grow else -marginSize)
+    helper.effectParameters = {
+        "MarginSizeMm": marginSize if method == MarginMethod.Grow else -marginSize,
+    }
     return helper.run(segmentation)
 
 
@@ -96,8 +102,10 @@ def hollow(segmentation: slicer.vtkMRMLSegmentationNode,
            method: HollowMethod,
            thickness: Annotated[float, WithinRange(0.01, 100), Default(3), Decimals(2), SingleStep(0.01)]) -> slicer.vtkMRMLSegmentationNode:
     helper = SegmentEditorHelper("Hollow")
-    helper.effect.setParameter("ShellMode", method.value)
-    helper.effect.setParameter("ShellThicknessMm", thickness)
+    helper.effectParameters = {
+        "ShellMode": method.value,
+        "ShellThicknessMm": thickness,
+    }
     return helper.run(segmentation)
 
 
@@ -105,8 +113,10 @@ def hollow(segmentation: slicer.vtkMRMLSegmentationNode,
 def islandsKeepLargest(segmentation: slicer.vtkMRMLSegmentationNode,
                        minimumSizeVoxels: Annotated[int, Minimum(0), Default(1000)]) -> slicer.vtkMRMLSegmentationNode:
     helper = SegmentEditorHelper("Islands")
-    helper.effect.setParameter("Operation", SegmentEditorEffects.KEEP_LARGEST_ISLAND)
-    helper.effect.setParameter("MinimumSize", minimumSizeVoxels)
+    helper.effectParameters = {
+        "Operation": SegmentEditorEffects.KEEP_LARGEST_ISLAND,
+        "MinimumSize": minimumSizeVoxels,
+    }
     return helper.run(segmentation)
 
 
@@ -114,8 +124,10 @@ def islandsKeepLargest(segmentation: slicer.vtkMRMLSegmentationNode,
 def islandsRemoveSmall(segmentation: slicer.vtkMRMLSegmentationNode,
                        minimumSizeVoxels: Annotated[int, Minimum(0), Default(1000)]) -> slicer.vtkMRMLSegmentationNode:
     helper = SegmentEditorHelper("Islands")
-    helper.effect.setParameter("Operation", SegmentEditorEffects.REMOVE_SMALL_ISLANDS)
-    helper.effect.setParameter("MinimumSize", minimumSizeVoxels)
+    helper.effectParameters = {
+        "Operation": SegmentEditorEffects.REMOVE_SMALL_ISLANDS,
+        "MinimumSize": minimumSizeVoxels,
+    }
     return helper.run(segmentation)
 
 
@@ -124,8 +136,10 @@ def thresholding(volume: slicer.vtkMRMLScalarVolumeNode,
                  thresholdRange: Annotated[FloatRange, RangeBounds(-3000, 3000), Default(FloatRange(-100, 100)), SingleStep(1), Decimals(2)]
                 ) -> slicer.vtkMRMLSegmentationNode:
     helper = SegmentEditorHelper("Threshold")
-    helper.effect.setParameter("MinimumThreshold", thresholdRange.minimum)
-    helper.effect.setParameter("MaximumThreshold", thresholdRange.maximum)
+    helper.effectParameters = {
+        "MinimumThreshold": thresholdRange.minimum,
+        "MaximumThreshold": thresholdRange.maximum,
+    }
     segmentationNode = slicer.mrmlScene.AddNewNodeByClass('vtkMRMLSegmentationNode')
     segmentationNode.CreateBinaryLabelmapRepresentation()
     segmentationNode.CreateDefaultDisplayNodes()
