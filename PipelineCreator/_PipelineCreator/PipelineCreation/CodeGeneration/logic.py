@@ -240,32 +240,13 @@ def _generateDecorator(
     dependencies = dependencies or []
     categories = categories or []
     # decoratorCode = f"{decoratorName}(name=\"Pipelines.{name}\", dependencies={dependencies}, categories={categories})"
-    decoratorCode = f"{decoratorName}(name=\"Pipelines.{name}\")"
+    decoratorCode = f"{decoratorName}(name=\"Pipelines.{name}\, dependencies={dependencies}\")"
 
     return decoratorCode
 
-def _getDependencies(
-        pipeline: nx.DiGraph,
-        registeredPipelines: dict[str, PipelineInfo]) -> list[str]:
-    """
-        Collects dependencies from all nodes in the graph
-        TODO - Test 
-    """
-
-    dependencies = []
-    
-    for node in pipeline:
-        print(f"Node: {node}")
-        pipelineName = node[1]
-        if pipelineName != None and pipelineName in registeredPipelines:
-            dependencies += registeredPipelines[pipelineName].dependencies
-    dependencies = list(set(dependencies))
-    print(f"Calculated Dependencies: {dependencies}")
-    return dependencies
-
-
 def createLogic(name: str,
                 pipeline: nx.DiGraph,
+                dependencies: list[str],
                 registeredPipelines: dict[str, PipelineInfo],
                 parameterNodeOutputsName: str,
                 runFunctionName: str="run",
@@ -276,7 +257,6 @@ def createLogic(name: str,
     Returns a string which is the python code for the module logic.
     """
     logicName = f"{name}Logic"
-    dependencies = [] #_getDependencies(pipeline, registeredPipelines)
     pipelineDecorator = _generateDecorator(name, dependencies, None)
     runFunctionCode, runFunctionImports = _generateRunFunction(pipeline, registeredPipelines, runFunctionName, parameterNodeOutputsName, tab)
 

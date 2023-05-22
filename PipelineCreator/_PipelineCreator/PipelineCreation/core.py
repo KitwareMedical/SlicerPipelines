@@ -23,12 +23,14 @@ def _createPythonFileCode(name: str,
                           tab: str = " " * 4):
     runFunctionName = "run"
     # from PipelineCreation.CodeGeneration.module import createModule
-    # TODO HS 20230512 Do we need to figure dependencies out transitively?
+
+    dependencies = _gatherDependencies(pipeline, registeredPipelines)
+
     module = CodeGeneration.createModule(
         name=name,
         title=name,
         categories=["PipelineModules"],
-        dependencies=[],
+        dependencies=dependencies,
         contributors=["Connor Bowley (Kitware, Inc)", "PipelineCreator"],
         helpText="This module was created by the PipelineCreator.",
         acknowledgementText="This module was created by the PipelineCreator.",
@@ -42,6 +44,7 @@ def _createPythonFileCode(name: str,
     logic = CodeGeneration.createLogic(
         name=f"{name}",
         pipeline=pipeline,
+        dependencies=dependencies,
         registeredPipelines=registeredPipelines,
         parameterNodeOutputsName=f"{name}Outputs",
         runFunctionName=runFunctionName,
@@ -83,6 +86,17 @@ def _validatePipelineName(pipelineName: str) -> None:
 
         if errorStr:
             raise Exception(f"Error creating pipeline: \n{errorStr}")
+        
+def _gatherDependencies(pipeline: nx.DiGraph, registeredPipelines: dict[str, PipelineInfo]) -> list[str]:
+    """
+    Gathers all dependencies of the pipeline.
+    """
+    dependencies = []
+    for node in pipeline.nodes:
+        pipelineName = node[1]
+        if pipelineName != None and pipelineName in registeredPipelines:
+            dependencies += registeredPipelines[pipelineName].dependencies
+    return list(set(dependencies))
 
 
 def _validateOutputDirectory(outputDirectory: pathlib.Path) -> None:

@@ -3,37 +3,24 @@ import os
 import pickle  # this shows as unused but is used by test_cleanType during the eval
 import sys
 import tempfile
-from typing import Annotated
 import unittest
+from typing import Annotated
 
 import networkx as nx
-
 import qt
-
-
 import slicer
 import vtk
-
-from slicer.parameterNodeWrapper import (
-    findChildWidgetForParameter,
-    parameterPack,
-    Decimals,
-    Default,
-    Minimum,
-    SingleStep,
-    WithinRange,
-)
-
-from slicer import (
-    vtkMRMLLabelMapVolumeNode,
-    vtkMRMLModelNode,
-    vtkMRMLScalarVolumeNode,
-    vtkMRMLSegmentationNode,
-)
-
-from PipelineCreator import PipelineCreatorLogic
 from _PipelineCreator import PipelineCreation
 from _PipelineCreator.PipelineRegistrar import PipelineRegistrar
+from slicer import (vtkMRMLLabelMapVolumeNode, vtkMRMLModelNode,
+                    vtkMRMLScalarVolumeNode, vtkMRMLSegmentationNode)
+from slicer.parameterNodeWrapper import (Decimals, Default, Minimum,
+                                         SingleStep, WithinRange,
+                                         findChildWidgetForParameter,
+                                         parameterPack)
+
+from PipelineCreator import PipelineCreatorLogic
+
 
 class TempPythonModule:
     def __init__(self, codeAsString):
@@ -227,7 +214,8 @@ def funcTestMathPipeline(string: str, additive: int, factor: int) -> int:
 
 class PipelineCreatorUtilTests(unittest.TestCase):
     def test_cleanType(self) -> None:
-        from _PipelineCreator.PipelineCreation.CodeGeneration.util import typeAsCode
+        from _PipelineCreator.PipelineCreation.CodeGeneration.util import \
+            typeAsCode
         self.assertEqual(typeAsCode(int), "int")
         self.assertEqual(typeAsCode(float), "float")
         self.assertEqual(typeAsCode(bool), "bool")
@@ -506,7 +494,8 @@ class PipelineCreatorCodeGenModuleTests(unittest.TestCase):
         PipelineCreatorLogic._singletonRegistrar = PipelineRegistrar()
 
     def test_module(self):
-        from _PipelineCreator.PipelineCreation.CodeGeneration.module import createModule
+        from _PipelineCreator.PipelineCreation.CodeGeneration.module import \
+            createModule
         code = createModule(
             name="TestPipeline",
             title="Test Pipeline",
@@ -541,25 +530,26 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         slicer.mrmlScene.Clear()
         self.logic = PipelineCreatorLogic(False)
         # node pipelines
-        self.logic.registerPipeline("passthru", passthru, [])
-        self.logic.registerPipeline("centerOfX", centerOfX, [])
-        self.logic.registerPipeline("decimation", decimation, [])
-        self.logic.registerPipeline("translate", translate, [])
+        self.logic.registerPipeline("passthru", passthru, ["passthrough"])
+        self.logic.registerPipeline("centerOfX", centerOfX, ["centerOfX"])
+        self.logic.registerPipeline("decimation", decimation, ["decimation"])
+        self.logic.registerPipeline("translate", translate, ["translate"])
         # math pipelines
-        self.logic.registerPipeline("add", add, [])
-        self.logic.registerPipeline("multiply", multiply, [])
-        self.logic.registerPipeline("plusMinus", plusMinus, [])
-        self.logic.registerPipeline("strlen", strlen, [])
+        self.logic.registerPipeline("add", add, ["add"])
+        self.logic.registerPipeline("multiply", multiply, ["multiply"])
+        self.logic.registerPipeline("plusMinus", plusMinus, ["plusMinus"])
+        self.logic.registerPipeline("strlen", strlen, ["strlen"])
     
     def tearDown(self) -> None:
-        # clean up the singleton on tear down as not to polute the global state
+        # clean up the singleton on tear down as not to pollute the global state
         PipelineCreatorLogic._singletonRegistrar = PipelineRegistrar()
 
     def test_logic(self):
         pipeline = makeTestMathPipeline(self.logic.registeredPipelines)
 
-        from _PipelineCreator.PipelineCreation.CodeGeneration.logic import createLogic
-        code = createLogic("TestPipeline", pipeline, self.logic.registeredPipelines, "", tab=" "*4)
+        from _PipelineCreator.PipelineCreation.CodeGeneration.logic import \
+            createLogic
+        code = createLogic("TestPipeline", pipeline, [], self.logic.registeredPipelines, "", tab=" "*4)
         fullCode = "\n".join([code.imports, code.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -603,9 +593,10 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
         PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
 
-        from _PipelineCreator.PipelineCreation.CodeGeneration import createLogic, createParameterNode
+        from _PipelineCreator.PipelineCreation.CodeGeneration import (
+            createLogic, createParameterNode)
         paramNodeCode = createParameterNode("TestPipeline", pipeline, tab=" "*4)
-        logicCode = createLogic("TestPipeline", pipeline, self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
+        logicCode = createLogic("TestPipeline", pipeline, [], self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
         fullCode = "\n".join([paramNodeCode.imports, logicCode.imports, paramNodeCode.code, logicCode.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -650,9 +641,10 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
         PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
 
-        from _PipelineCreator.PipelineCreation.CodeGeneration import createLogic, createParameterNode
+        from _PipelineCreator.PipelineCreation.CodeGeneration import (
+            createLogic, createParameterNode)
         paramNodeCode = createParameterNode("TestPipeline", pipeline, tab=" "*4)
-        logicCode = createLogic("TestPipeline", pipeline, self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
+        logicCode = createLogic("TestPipeline", pipeline, [], self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
         fullCode = "\n".join([paramNodeCode.imports, logicCode.imports, paramNodeCode.code, logicCode.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -693,8 +685,9 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
         PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
 
-        from _PipelineCreator.PipelineCreation.CodeGeneration.logic import createLogic
-        code = createLogic("TestPipelineLogicDeleteIntermediates", pipeline, self.logic.registeredPipelines, "", tab=" "*4)
+        from _PipelineCreator.PipelineCreation.CodeGeneration.logic import \
+            createLogic
+        code = createLogic("TestPipelineLogicDeleteIntermediates", pipeline, [], self.logic.registeredPipelines, "", tab=" "*4)
         fullCode = "\n".join([code.imports, code.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -706,6 +699,43 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
             # make sure there is an intermediate results still remaining for each step
             newNumModels = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")
             self.assertEqual(newNumModels - numModels, 2)
+
+    def test_gather_dependencies(self):
+        # Pipeline for testing
+        pipeline = nx.DiGraph()
+        pipeline.add_node((0, None, "mesh"), datatype=vtkMRMLModelNode)
+
+        pipeline.add_node((1, "decimation", "mesh"))
+        pipeline.add_node((1, "decimation", "reduction"), fixed_value=0.5)  # set fixed_value inline
+        pipeline.add_node((1, "decimation", "return"))
+
+        pipeline.add_node((2, "translate", "mesh"))
+        pipeline.add_node((2, "translate", "x"), fixed_value=0)
+        pipeline.add_node((2, "translate", "y"), fixed_value=0)
+        pipeline.add_node((2, "translate", "z"), fixed_value=0)
+        pipeline.add_node((2, "translate", "return"))
+
+        pipeline.add_node((3, None, "outputMesh"), datatype=vtkMRMLModelNode)
+
+        # connectivity
+        numNodes = len(pipeline.nodes)
+        pipeline.add_edges_from([
+            # connections into step 1
+            ((0, None, "mesh"),           (1, "decimation", "mesh")),
+            # connections into step 2
+            ((1, "decimation", "return"), (2, "translate", "mesh")),
+            # final output
+            ((2, "translate", "return"),  (3, None, "outputMesh"))
+        ])
+
+        assert len(pipeline.nodes) == numNodes, "did not want to add new nodes"
+        PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
+
+        from _PipelineCreator.PipelineCreation.core import _gatherDependencies
+        dependencies = _gatherDependencies(pipeline, self.logic.registeredPipelines)
+        
+        self.assertEqual(len(dependencies), 2)
+        self.assertSetEqual(set(dependencies), set(["decimation", "translate"]))
 
 
 class PipelineCreatorFullTests(unittest.TestCase):
