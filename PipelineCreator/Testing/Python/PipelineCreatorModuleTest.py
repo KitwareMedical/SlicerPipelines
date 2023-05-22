@@ -10,6 +10,7 @@ import networkx as nx
 
 import qt
 
+
 import slicer
 import vtk
 
@@ -32,6 +33,7 @@ from slicer import (
 
 from PipelineCreator import PipelineCreatorLogic
 from _PipelineCreator import PipelineCreation
+from _PipelineCreator.PipelineRegistrar import PipelineRegistrar
 
 class TempPythonModule:
     def __init__(self, codeAsString):
@@ -498,6 +500,11 @@ class PipelineCreatorValidationTest(unittest.TestCase):
             PipelineCreation.validation.validatePipeline(pipeline, self.logic.registeredPipelines)
 
 class PipelineCreatorCodeGenModuleTests(unittest.TestCase):
+
+    def tearDown(self) -> None:
+        # clean up the singleton on tear down as not to polute the global state
+        PipelineCreatorLogic._singletonRegistrar = PipelineRegistrar()
+
     def test_module(self):
         from _PipelineCreator.PipelineCreation.CodeGeneration.module import createModule
         code = createModule(
@@ -543,12 +550,16 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         self.logic.registerPipeline("multiply", multiply, [])
         self.logic.registerPipeline("plusMinus", plusMinus, [])
         self.logic.registerPipeline("strlen", strlen, [])
+    
+    def tearDown(self) -> None:
+        # clean up the singleton on tear down as not to polute the global state
+        PipelineCreatorLogic._singletonRegistrar = PipelineRegistrar()
 
     def test_logic(self):
         pipeline = makeTestMathPipeline(self.logic.registeredPipelines)
 
         from _PipelineCreator.PipelineCreation.CodeGeneration.logic import createLogic
-        code = createLogic("TestPipelineLogic", pipeline, self.logic.registeredPipelines, "", tab=" "*4)
+        code = createLogic("TestPipeline", pipeline, self.logic.registeredPipelines, "", tab=" "*4)
         fullCode = "\n".join([code.imports, code.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -594,7 +605,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
 
         from _PipelineCreator.PipelineCreation.CodeGeneration import createLogic, createParameterNode
         paramNodeCode = createParameterNode("TestPipeline", pipeline, tab=" "*4)
-        logicCode = createLogic("TestPipelineLogic", pipeline, self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
+        logicCode = createLogic("TestPipeline", pipeline, self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
         fullCode = "\n".join([paramNodeCode.imports, logicCode.imports, paramNodeCode.code, logicCode.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -641,7 +652,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
 
         from _PipelineCreator.PipelineCreation.CodeGeneration import createLogic, createParameterNode
         paramNodeCode = createParameterNode("TestPipeline", pipeline, tab=" "*4)
-        logicCode = createLogic("TestPipelineLogic", pipeline, self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
+        logicCode = createLogic("TestPipeline", pipeline, self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
         fullCode = "\n".join([paramNodeCode.imports, logicCode.imports, paramNodeCode.code, logicCode.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -687,7 +698,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         fullCode = "\n".join([code.imports, code.code])
 
         with TempPythonModule(fullCode) as tempModule:
-            logic = tempModule.TestPipelineLogicDeleteIntermediates()
+            logic = tempModule.TestPipelineLogicDeleteIntermediatesLogic()
 
             model = makeSphereModel(self)
             numModels = slicer.mrmlScene.GetNumberOfNodesByClass("vtkMRMLModelNode")

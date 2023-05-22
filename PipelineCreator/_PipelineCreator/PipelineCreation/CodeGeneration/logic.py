@@ -1,29 +1,18 @@
 import itertools
-import networkx as nx
 import pickle
 import re
 import textwrap
 from typing import Union
 
+import networkx as nx
 import slicer
-
-from slicer.parameterNodeWrapper import unannotatedType
-
-from _PipelineCreator.PipelineRegistrar import PipelineInfo
-
-from _PipelineCreator.PipelineCreation.util import (
-    getStep,
-    groupNodesByStep,
-    splitParametersFromReturn,
-)
 from _PipelineCreator.PipelineCreation.CodeGeneration.util import (
-    CodePiece,
-    cleanupImports,
-    importCodeForType,
-    importCodeForTypes,
-    typeAsCode,
-    valueAsCode,
-)
+    CodePiece, cleanupImports, importCodeForType, importCodeForTypes,
+    typeAsCode, valueAsCode)
+from _PipelineCreator.PipelineCreation.util import (getStep, groupNodesByStep,
+                                                    splitParametersFromReturn)
+from _PipelineCreator.PipelineRegistrar import PipelineInfo
+from slicer.parameterNodeWrapper import unannotatedType
 
 __all__ = ["createLogic"]
 
@@ -44,7 +33,7 @@ def _makeToplevelFunctionSignature(functionName, fullPipeline, returnType: Union
     necessaryImports = "from PipelineCreator import PipelineProgressCallback\n" + importCodeForTypes(params, fullPipeline)
     if not isinstance(returnType, str):
         necessaryImports += "\n" + importCodeForType(returnType)
-    return f"{functionName}({parameterString}, *, progress_callback=PipelineProgressCallback(), delete_intermediate_nodes=True) -> {returnTypeCode}", necessaryImports
+    return f"{functionName}({parameterString}, *, progress_callback: PipelineProgressCallback = PipelineProgressCallback(), delete_intermediate_nodes: bool=True) -> {returnTypeCode}", necessaryImports
 
 
 def _varName(node) -> str:
@@ -236,6 +225,44 @@ def _generateRunFunction(pipeline: nx.DiGraph,
 
     return code, necessaryImports
 
+def _generateDecorator(
+        name: str,
+        dependencies: list[str],
+        categories: list[str],
+        decoratorName: str="@slicerPipeline") -> str:
+    """
+    Generates the @slicerPipeline decorator.
+        def slicerPipeline(name=None, dependencies=None, categories=None):
+        @slicerPipeline(name="Export Segmentation to LabelMap", categories=["Conversions", "Segmentation Operations"]) 
+        Add categories input to the user interface
+    """
+    name = name.replace('"', '\\"')
+    dependencies = dependencies or []
+    categories = categories or []
+    # decoratorCode = f"{decoratorName}(name=\"Pipelines.{name}\", dependencies={dependencies}, categories={categories})"
+    decoratorCode = f"{decoratorName}(name=\"Pipelines.{name}\")"
+
+    return decoratorCode
+
+def _getDependencies(
+        pipeline: nx.DiGraph,
+        registeredPipelines: dict[str, PipelineInfo]) -> list[str]:
+    """
+        Collects dependencies from all nodes in the graph
+        TODO - Test 
+    """
+
+    dependencies = []
+    
+    for node in pipeline:
+        print(f"Node: {node}")
+        pipelineName = node[1]
+        if pipelineName != None and pipelineName in registeredPipelines:
+            dependencies += registeredPipelines[pipelineName].dependencies
+    dependencies = list(set(dependencies))
+    print(f"Calculated Dependencies: {dependencies}")
+    return dependencies
+
 
 def createLogic(name: str,
                 pipeline: nx.DiGraph,
@@ -248,17 +275,21 @@ def createLogic(name: str,
 
     Returns a string which is the python code for the module logic.
     """
+    logicName = f"{name}Logic"
+    dependencies = [] #_getDependencies(pipeline, registeredPipelines)
+    pipelineDecorator = _generateDecorator(name, dependencies, None)
     runFunctionCode, runFunctionImports = _generateRunFunction(pipeline, registeredPipelines, runFunctionName, parameterNodeOutputsName, tab)
 
     constantImports = """
 import pickle
 import slicer
 from slicer.ScriptedLoadableModule import ScriptedLoadableModuleLogic
+from PipelineCreator import slicerPipeline
 """.lstrip()
     allImports = cleanupImports(constantImports + runFunctionImports)
 
     logicCode = f"""#
-# {name}
+# {logicName}
 #
 
 def _nodeReferencedBy(node, listOfNodes):
@@ -271,12 +302,12 @@ def _nodeReferencedBy(node, listOfNodes):
 {tab}{tab}{tab}{tab}{tab}return True
 {tab}return False
 
-class {name}(ScriptedLoadableModuleLogic):
+class {logicName}(ScriptedLoadableModuleLogic):
 {tab}def __init__(self):
 {tab}{tab}ScriptedLoadableModuleLogic.__init__(self)
 
-{tab}# TODO: insert pipeline decorator here
 {tab}@staticmethod
+{tab}{pipelineDecorator}
 {textwrap.indent(runFunctionCode, tab)}
 """
 
