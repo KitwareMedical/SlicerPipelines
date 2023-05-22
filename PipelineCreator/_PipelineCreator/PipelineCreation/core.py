@@ -23,11 +23,12 @@ def _createPythonFileCode(name: str,
                           tab: str = " " * 4):
     runFunctionName = "run"
     # from PipelineCreation.CodeGeneration.module import createModule
+    # TODO HS 20230512 Do we need to figure dependencies out transitively?
     module = CodeGeneration.createModule(
         name=name,
         title=name,
         categories=["PipelineModules"],
-        dependencies=["PipelineCreator"],
+        dependencies=[],
         contributors=["Connor Bowley (Kitware, Inc)", "PipelineCreator"],
         helpText="This module was created by the PipelineCreator.",
         acknowledgementText="This module was created by the PipelineCreator.",
@@ -39,7 +40,7 @@ def _createPythonFileCode(name: str,
         tab=tab)
 
     logic = CodeGeneration.createLogic(
-        name=f"{name}Logic",
+        name=f"{name}",
         pipeline=pipeline,
         registeredPipelines=registeredPipelines,
         parameterNodeOutputsName=f"{name}Outputs",
