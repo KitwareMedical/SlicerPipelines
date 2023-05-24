@@ -13,20 +13,15 @@ except ImportError:
     import networkx as nx
 
 import qt
-
 import slicer
+from _PipelineCreator import PipelineCreation
+from _PipelineCreator.PipelineRegistrar import PipelineInfo, PipelineRegistrar
+from slicer.parameterNodeWrapper import Default, parameterNodeWrapper
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
-from slicer.parameterNodeWrapper import (
-    Default,
-    parameterNodeWrapper,
-)
-
-from _PipelineCreator.PipelineRegistrar import PipelineRegistrar, PipelineInfo
-from _PipelineCreator import PipelineCreation
-
 from Widgets.PipelineListWidget import PipelineListWidget
-from Widgets.PipelineProgressBar import PipelineProgressCallback, isPipelineProgressCallback
+from Widgets.PipelineProgressBar import (PipelineProgressCallback,
+                                         isPipelineProgressCallback)
 
 __all__ = [
     "PipelineRegistrar", # repackage to public because PipelineListWidget uses it
@@ -89,6 +84,7 @@ class PipelineCreatorParameterNode:
     The parameters needed by module.
     """
     pipelineName: str
+    categoryName: Annotated[str, Default("Pipeline Creator")]
     outputDirectory: pathlib.Path
     icon: Annotated[pathlib.Path, Default(generator=_defaultIcon)]
     loadModuleOnCreation: Annotated[bool, Default(True)]
@@ -142,6 +138,17 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.StepsContainerWidget.setLayout(qt.QVBoxLayout())
         self.ui.PipelineListWidget = PipelineListWidget(self.logic.registrar)
         self.ui.StepsContainerWidget.layout().addWidget(self.ui.PipelineListWidget)
+  
+        # Add pipeline categories to the combo box, select "Pipeline Creator" as default
+        # Note the combobox gui wrapper is set to expect fixed choices can't be used here atm
+        categories = set(c for info in self.logic.registeredPipelines.values() for c in info.categories)
+        categories.add("Pipeline Creator")
+        categories = sorted(list(categories))
+        self.ui.CategoryComboBox.addItems(categories)
+        self.ui.CategoryComboBox.setCurrentText('Pipeline Creator')
+        self.ui.CategoryComboBox.setEditable(True)
+        self.ui.CategoryComboBox.connect('currentTextChanged(QString)', self.onCategoryChanged) 
+
 
         # Connections
         self.ui.GeneratePipelineButton.clicked.connect(self.onGeneratePipeline)
@@ -216,6 +223,12 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             # ui element that needs connection.
             self._parameterNodeGuiTag = self._parameterNode.connectGui(self.ui)
 
+    def onCategoryChanged(self, text: str) -> None:
+        """
+        Called when the user selects a category from the combo box.
+        """
+        self._parameterNode.categoryName = text
+
     def onTestPipeline(self):
         """
         To test the pipeline, we generate it, load it halfway into the python and slicer module infrastructures
@@ -231,7 +244,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         filepath = os.path.join(tempDir, f"{pipelineName}.py")
         print(f"Temporary pipeline at {filepath}")
         self._testNum += 1
-        self._generatePipeline(pipelineName, tempDir, popUpOnSuccess=False)
+        self._generatePipeline(pipelineName, [self._parameterNode.categoryName], tempDir, popUpOnSuccess=False)
 
         # load it as a Python module
         spec = importlib.util.spec_from_file_location(pipelineName, filepath)
@@ -256,6 +269,9 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
             pipelineWidget._parameterNode.parameterNode.RemoveAllObservers()
             pipelineWidget._parameterNode.parameterNode.UnsetAllParameters()
 
+            # remove the pipeline from the registry
+            self.logic.registrar.removePipeline(pipelineName)
+
         backButton = qt.QPushButton("Back")
         backButton.sizePolicy = qt.QSizePolicy(qt.QSizePolicy.Fixed, qt.QSizePolicy.Fixed)
         backButton.clicked.connect(onBack)
@@ -269,7 +285,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.StackedWidget.setCurrentIndex(index)
 
     def onGeneratePipeline(self):
-        self._generatePipeline(self._parameterNode.pipelineName, self._parameterNode.outputDirectory)
+        self._generatePipeline(self._parameterNode.pipelineName, [self._parameterNode.categoryName], self._parameterNode.outputDirectory)
 
         # this only runs if the generation didn't throw
         pipelineName = self._parameterNode.pipelineName
@@ -293,10 +309,11 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
                 rawSearchPaths.append(str(outputDirectory))
                 settings.setValue("Modules/AdditionalPaths", rawSearchPaths)
 
-    def _generatePipeline(self, pipelineName, outputDirectory, popUpOnSuccess=True):
+    def _generatePipeline(self, pipelineName, categories, outputDirectory, popUpOnSuccess=True):
         try:
             self.logic.createPipeline(
                 pipelineName,
+                categories,
                 outputDirectory,
                 self.ui.PipelineListWidget.computePipeline(),
                 self._parameterNode.icon)
@@ -377,6 +394,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
 
     def createPipeline(self,
                        name: str,
+                       categories: list[str],
                        outputDirectory: pathlib.Path,
                        pipeline: nx.DiGraph,
                        icon=None) -> None:
@@ -384,6 +402,7 @@ class PipelineCreatorLogic(ScriptedLoadableModuleLogic):
 
         PipelineCreation.createPipeline(
             name=name,
+            categories=categories,
             outputDirectory=outputDirectory,
             pipeline=pipeline,
             registeredPipelines=self.registeredPipelines,

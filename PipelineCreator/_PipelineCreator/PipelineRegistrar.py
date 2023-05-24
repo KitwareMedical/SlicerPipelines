@@ -60,6 +60,12 @@ class PipelineRegistrar:
                 types.add(unannotatedType(param))
             types.add(unannotatedType(info.returnType))
         return types
+    
+    def removePipeline(self, name):
+        """
+        Remove a pipeline from the registry
+        """
+        del self.registeredPipelines[name]
 
     def registerPipeline(self, name: str, function, dependencies, categories=None) -> None:
         """
