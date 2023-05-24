@@ -4,11 +4,9 @@ import pathlib
 import shutil
 
 import networkx as nx
-
 import slicer
-
-from _PipelineCreator.PipelineRegistrar import PipelineInfo
 from _PipelineCreator.PipelineCreation import CodeGeneration
+from _PipelineCreator.PipelineRegistrar import PipelineInfo
 
 from .validation import validatePipeline
 
@@ -19,6 +17,7 @@ __all__ = [
 
 def _createPythonFileCode(name: str,
                           pipeline: nx.DiGraph,
+                          categories: list[str],
                           registeredPipelines: dict[str, PipelineInfo],
                           tab: str = " " * 4):
     runFunctionName = "run"
@@ -45,6 +44,7 @@ def _createPythonFileCode(name: str,
         name=f"{name}",
         pipeline=pipeline,
         dependencies=dependencies,
+        categories=categories,
         registeredPipelines=registeredPipelines,
         parameterNodeOutputsName=f"{name}Outputs",
         runFunctionName=runFunctionName,
@@ -117,11 +117,13 @@ def _validateIcon(icon):
 
 
 def createPipeline(name: str,
+                   categories: list[str],
                    outputDirectory: pathlib.Path,
                    pipeline: nx.DiGraph,
                    registeredPipelines: dict[str, PipelineInfo],
                    icon: pathlib.Path,
                    tab: str = " " * 4) -> None:
+
 
     # error checking
     _validatePipelineName(name)
@@ -130,7 +132,7 @@ def createPipeline(name: str,
     _validateIcon(icon)
 
     # Python file
-    pythonFileCode =_createPythonFileCode(name, pipeline, registeredPipelines, tab)
+    pythonFileCode =_createPythonFileCode(name, pipeline, categories, registeredPipelines, tab)
     with open(os.path.join(outputDirectory, f"{name}.py"), 'w') as pyfile:
         pyfile.write(pythonFileCode)
 

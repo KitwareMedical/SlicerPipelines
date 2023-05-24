@@ -490,7 +490,7 @@ class PipelineCreatorValidationTest(unittest.TestCase):
 class PipelineCreatorCodeGenModuleTests(unittest.TestCase):
 
     def tearDown(self) -> None:
-        # clean up the singleton on tear down as not to polute the global state
+        # clean up the singleton on tear down as not to pollute the global state
         PipelineCreatorLogic._singletonRegistrar = PipelineRegistrar()
 
     def test_module(self):
@@ -549,7 +549,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
 
         from _PipelineCreator.PipelineCreation.CodeGeneration.logic import \
             createLogic
-        code = createLogic("TestPipeline", pipeline, [], self.logic.registeredPipelines, "", tab=" "*4)
+        code = createLogic("TestPipeline", pipeline, [], [], self.logic.registeredPipelines, "", tab=" "*4)
         fullCode = "\n".join([code.imports, code.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -596,7 +596,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         from _PipelineCreator.PipelineCreation.CodeGeneration import (
             createLogic, createParameterNode)
         paramNodeCode = createParameterNode("TestPipeline", pipeline, tab=" "*4)
-        logicCode = createLogic("TestPipeline", pipeline, [], self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
+        logicCode = createLogic("TestPipeline", pipeline, [], [], self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
         fullCode = "\n".join([paramNodeCode.imports, logicCode.imports, paramNodeCode.code, logicCode.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -644,7 +644,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         from _PipelineCreator.PipelineCreation.CodeGeneration import (
             createLogic, createParameterNode)
         paramNodeCode = createParameterNode("TestPipeline", pipeline, tab=" "*4)
-        logicCode = createLogic("TestPipeline", pipeline, [], self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
+        logicCode = createLogic("TestPipeline", pipeline, [], [], self.logic.registeredPipelines, "TestPipelineOutputs", tab=" "*4)
         fullCode = "\n".join([paramNodeCode.imports, logicCode.imports, paramNodeCode.code, logicCode.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -687,7 +687,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
 
         from _PipelineCreator.PipelineCreation.CodeGeneration.logic import \
             createLogic
-        code = createLogic("TestPipelineLogicDeleteIntermediates", pipeline, [], self.logic.registeredPipelines, "", tab=" "*4)
+        code = createLogic("TestPipelineLogicDeleteIntermediates", pipeline, [], [], self.logic.registeredPipelines, "", tab=" "*4)
         fullCode = "\n".join([code.imports, code.code])
 
         with TempPythonModule(fullCode) as tempModule:
@@ -753,6 +753,10 @@ class PipelineCreatorFullTests(unittest.TestCase):
         self.logic.registerPipeline("addFloat", addFloat, [])
         self.logic.registerPipeline("multiply", multiply, [])
         self.logic.registerPipeline("strlen", strlen, [])
+
+    def tearDown(self) -> None:
+        # clean up the singleton on tear down as not to pollute the global state
+        PipelineCreatorLogic._singletonRegistrar = PipelineRegistrar()
 
     def _test_the_whole_shebang_widget_paramnode_connections(self, widget):
         param = widget._parameterNode
@@ -898,12 +902,14 @@ class PipelineCreatorFullTests(unittest.TestCase):
         # fixed values
         pipeline.nodes[(2, "translate", "z")]["fixed_value"] = 0
 
-        moduleName = "PipelineCreatorTestModule"
+        moduleName = "PipelineCreatorTestModuleShebang"
 
         with tempfile.TemporaryDirectory() as tempDir:
             # Make output
+            categories = ["PipelineModules", "Segmentation"]
             self.logic.createPipeline(
                 name=moduleName,
+                categories=categories,
                 outputDirectory=tempDir,
                 pipeline=pipeline,
             )
@@ -915,12 +921,19 @@ class PipelineCreatorFullTests(unittest.TestCase):
 
             slicer.util.selectModule(moduleName)
 
-            widget = slicer.modules.PipelineCreatorTestModuleWidget
+            widget = slicer.modules.PipelineCreatorTestModuleShebangWidget
             logic = widget.logic
-            self.assertEqual(logic.__class__.__name__, "PipelineCreatorTestModuleLogic")
+            self.assertEqual(logic.__class__.__name__, "PipelineCreatorTestModuleShebangLogic")
 
             self._test_the_whole_shebang_widget_paramnode_connections(widget)
             self._test_the_whole_shebang_logic_run(logic, widget)
+
+            # check the registration in the global Registry
+            registeredPipelines = PipelineCreatorLogic().registeredPipelines
+            self.assertTrue(moduleName in registeredPipelines)
+            info = registeredPipelines[moduleName]
+            self.assertEqual(set(info.categories), set(categories))
+
             # import pdb; pdb.set_trace()
 
     def test_the_whole_shebang_no_models(self):
@@ -932,6 +945,7 @@ class PipelineCreatorFullTests(unittest.TestCase):
             # Make output
             self.logic.createPipeline(
                 name=moduleName,
+                categories=[],
                 outputDirectory=tempDir,
                 pipeline=pipeline,
             )
@@ -1029,6 +1043,7 @@ class PipelineCreatorFullTests(unittest.TestCase):
             # Make output
             self.logic.createPipeline(
                 name=moduleName,
+                categories=[],
                 outputDirectory=tempDir,
                 pipeline=pipeline,
             )
@@ -1118,6 +1133,7 @@ class PipelineCreatorFullTests(unittest.TestCase):
             # Make output
             self.logic.createPipeline(
                 name=moduleName,
+                categories=[],
                 outputDirectory=tempDir,
                 pipeline=pipeline,
             )
@@ -1204,6 +1220,7 @@ class PipelineCreatorFullTests(unittest.TestCase):
             # Make output
             self.logic.createPipeline(
                 name=moduleName,
+                categories=[],
                 outputDirectory=tempDir,
                 pipeline=pipeline,
             )

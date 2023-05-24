@@ -231,22 +231,21 @@ def _generateDecorator(
         categories: list[str],
         decoratorName: str="@slicerPipeline") -> str:
     """
-    Generates the @slicerPipeline decorator.
+        Generates the @slicerPipeline decorator.
         def slicerPipeline(name=None, dependencies=None, categories=None):
         @slicerPipeline(name="Export Segmentation to LabelMap", categories=["Conversions", "Segmentation Operations"]) 
-        Add categories input to the user interface
     """
     name = name.replace('"', '\\"')
     dependencies = dependencies or []
     categories = categories or []
-    # decoratorCode = f"{decoratorName}(name=\"Pipelines.{name}\", dependencies={dependencies}, categories={categories})"
-    decoratorCode = f"{decoratorName}(name=\"Pipelines.{name}\, dependencies={dependencies}\")"
+    decoratorCode = f"{decoratorName}(name=\"{name}\", dependencies={dependencies}, categories={categories})"
 
     return decoratorCode
 
 def createLogic(name: str,
                 pipeline: nx.DiGraph,
                 dependencies: list[str],
+                categories: list[str],
                 registeredPipelines: dict[str, PipelineInfo],
                 parameterNodeOutputsName: str,
                 runFunctionName: str="run",
@@ -257,7 +256,9 @@ def createLogic(name: str,
     Returns a string which is the python code for the module logic.
     """
     logicName = f"{name}Logic"
-    pipelineDecorator = _generateDecorator(name, dependencies, None)
+    pipelineDecorator = _generateDecorator(name=name, 
+                                           dependencies=dependencies, 
+                                           categories=categories)
     runFunctionCode, runFunctionImports = _generateRunFunction(pipeline, registeredPipelines, runFunctionName, parameterNodeOutputsName, tab)
 
     constantImports = """
