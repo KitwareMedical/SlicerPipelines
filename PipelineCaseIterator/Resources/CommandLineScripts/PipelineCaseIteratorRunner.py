@@ -30,7 +30,7 @@ def cleanupQuotes(args):
 def main(args):
   runner = PipelineCaseIteratorRunner(
     args.pipelineName,
-    args.inputDirectory,
+    args.inputFile,
     args.outputDirectory,
     outputExtension=args.outputExtension,
     prefix=args.prefix,
@@ -43,7 +43,7 @@ def main(args):
 if __name__ == "__main__":
 
   parser = argparse.ArgumentParser()
-  parser.add_argument('--inputDirectory', required=True)
+  parser.add_argument('--inputFile', required=True)
   parser.add_argument('--outputDirectory', required=True)
   parser.add_argument('--pipelineName', required=True)
   parser.add_argument('--prefix', required=False, default=None)

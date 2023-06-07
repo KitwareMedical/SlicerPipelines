@@ -13,61 +13,55 @@
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <layout class="QGridLayout" name="gridLayout">
-     <item row="2" column="1">
-      <widget class="QLineEdit" name="inputDirectoryLineEdit"/>
+     <item row="3" column="2">
+      <widget class="QPushButton" name="inputFileBrowseButton">
+       <property name="text">
+        <string>Browse</string>
+       </property>
+      </widget>
      </item>
      <item row="2" column="2">
-      <widget class="QPushButton" name="inputDirectoryBrowseButton">
-       <property name="text">
-        <string>Browse</string>
-       </property>
-      </widget>
-     </item>
-     <item row="4" column="1">
-      <widget class="QLineEdit" name="outputDirectoryLineEdit"/>
-     </item>
-     <item row="3" column="0">
-      <widget class="QLabel" name="label_2">
-       <property name="text">
-        <string>Pipeline</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="label">
-       <property name="sizePolicy">
-        <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-         <horstretch>0</horstretch>
-         <verstretch>0</verstretch>
-        </sizepolicy>
-       </property>
-       <property name="text">
-        <string>Input Directory</string>
-       </property>
-      </widget>
-     </item>
-     <item row="4" column="2">
-      <widget class="QPushButton" name="outputDirectoryBrowseButton">
-       <property name="text">
-        <string>Browse</string>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="2">
       <widget class="QPushButton" name="pipelineSelectionButton">
        <property name="text">
         <string>Select</string>
        </property>
       </widget>
      </item>
-     <item row="4" column="0">
+     <item row="5" column="2">
+      <widget class="QPushButton" name="outputDirectoryBrowseButton">
+       <property name="text">
+        <string>Browse</string>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="0">
       <widget class="QLabel" name="label_3">
        <property name="text">
         <string>Output Directory</string>
        </property>
       </widget>
      </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_2">
+       <property name="text">
+        <string>Pipeline</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="0">
+      <widget class="QLabel" name="label_11">
+       <property name="text">
+        <string>Input Parameters</string>
+       </property>
+      </widget>
+     </item>
      <item row="3" column="1">
+      <widget class="QLineEdit" name="inputFileLineEdit"/>
+     </item>
+     <item row="5" column="1">
+      <widget class="QLineEdit" name="outputDirectoryLineEdit"/>
+     </item>
+     <item row="2" column="1">
       <widget class="QLabel" name="pipelineNameLabel">
        <property name="sizePolicy">
         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
@@ -77,6 +71,13 @@
        </property>
        <property name="text">
         <string/>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="1">
+      <widget class="QPushButton" name="createTemplateFileButton">
+       <property name="text">
+        <string>Create Template Parameter File</string>
        </property>
       </widget>
      </item>
@@ -112,6 +113,12 @@
       <widget class="QProgressBar" name="pipelineProgressBar">
        <property name="value">
         <number>0</number>
+       </property>
+       <property name="textVisible">
+        <bool>true</bool>
+       </property>
+       <property name="invertedAppearance">
+        <bool>false</bool>
        </property>
       </widget>
      </item>
@@ -256,8 +263,6 @@
   </customwidget>
  </customwidgets>
  <tabstops>
-  <tabstop>inputDirectoryLineEdit</tabstop>
-  <tabstop>inputDirectoryBrowseButton</tabstop>
   <tabstop>pipelineSelectionButton</tabstop>
   <tabstop>outputDirectoryLineEdit</tabstop>
   <tabstop>outputDirectoryBrowseButton</tabstop>
