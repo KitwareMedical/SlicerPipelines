@@ -5,10 +5,8 @@ import csv
 
 from PipelineCaseIterator.Library.IteratorParameterFile import IteratorParameterFile
 
+
 class IteratorParametersTest(unittest.TestCase):
-    def __init__(self, methodName: str = 'runTest', dataDirectory: str = None ) -> None:
-        super().__init__(methodName)
-        self._dataDirectory = 'D:/SlicerPipelines/PipelineCaseIterator/Resources/Testing'
 
     def setUp(self) -> None:
         self._tempDirectory = tempfile.TemporaryDirectory()
@@ -17,9 +15,9 @@ class IteratorParametersTest(unittest.TestCase):
         self._tempDirectory.cleanup()
 
     def testCreateTemplate(self):
-        inputParameters : dict[str, typing.Annotated] = {'param1' : str, 'param2' : float}
+        inputParameters: dict[str, typing.Annotated] = {'param1': str, 'param2': float}
         expectedHeaders = ['param1:str', 'param2:float']
-        fileName = self._tempDirectory.name+'/file.csv'
+        fileName = self._tempDirectory.name + '/file.csv'
 
         parameters = IteratorParameterFile(inputParameters)
         parameters.createTemplate(fileName)
@@ -31,11 +29,11 @@ class IteratorParametersTest(unittest.TestCase):
                 break
 
     def testReadParameters(self):
-        inputParameters : dict[str, typing.Annotated] = {'param1' : str, 'param2' : float}
-        expectedParameters = [{'param1' : 'test1', 'param2' : '1.0'}, {'param1' : 'test2', 'param2' : '2.0'}]
-        fileName = self._tempDirectory.name+'\\file.csv'
+        inputParameters: dict[str, typing.Annotated] = {'param1': str, 'param2': float}
+        expectedParameters = [{'param1': 'test1', 'param2': '1.0'}, {'param1': 'test2', 'param2': '2.0'}]
+        fileName = self._tempDirectory.name + '\\file.csv'
 
-        with open(fileName, mode = 'w+') as file:
+        with open(fileName, mode='w+') as file:
             writer = csv.writer(file)
             writer.writerow(['param1', 'param2:float'])
             writer.writerow(['test1', '1.0'])
@@ -47,16 +45,16 @@ class IteratorParametersTest(unittest.TestCase):
         self.assertEqual(expectedParameters, parametersRead)
 
     def testIterateParameters(self):
-        inputParameters : dict[str, typing.Annotated] = {'param1' : str, 'param2' : float}
-        expectedParameters = [{'param1' : 'test1', 'param2' : '1.0'}, {'param1' : 'test2', 'param2' : '2.0'}]
-        fileName = self._tempDirectory.name+'\\file.csv'
+        inputParameters: dict[str, typing.Annotated] = {'param1': str, 'param2': float}
+        expectedParameters = [{'param1': 'test1', 'param2': '1.0'}, {'param1': 'test2', 'param2': '2.0'}]
+        fileName = self._tempDirectory.name + '\\file.csv'
 
-        with open(fileName, mode = 'w+') as file:
+        with open(fileName, mode='w+') as file:
             writer = csv.writer(file)
             writer.writerow(['param1', 'param2:float'])
             writer.writerow(['test1', '1.0'])
             writer.writerow(['test2', '2.0'])
-            
+
         parameters = IteratorParameterFile(inputParameters)
         parameters.readParameters(fileName)
 
@@ -65,7 +63,7 @@ class IteratorParametersTest(unittest.TestCase):
             parametersRead.append(parameter)
 
         self.assertEqual(expectedParameters, parametersRead)
-                
+
 
 if __name__ == '__main__':
     unittest.main()
