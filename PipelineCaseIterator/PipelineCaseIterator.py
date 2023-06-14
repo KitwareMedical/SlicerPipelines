@@ -6,6 +6,11 @@ import subprocess
 import traceback
 import typing
 
+from slicer.parameterNodeWrapper import (
+    isParameterPack,
+    splitAnnotations,
+    unannotatedType,
+)
 from Widgets.SelectPipelinePopUp import SelectPipelinePopUp
 # SelectModulePopUp
 from PipelineCreator import slicerPipeline
@@ -50,20 +55,21 @@ class PipelineCaseIteratorRunner(object):
         self._timestampFormat = timestampFormat
         self._timestamp = None
 
-        if outputExtension is None:
-            with ScopedNode(slicer.mrmlScene.AddNewNodeByClass(self._pipeline.returnType.__vtkname__)) as outputNode:
-                with ScopedDefaultStorageNode(outputNode) as store:
-                    writeFileTypes = store.GetSupportedWriteFileTypes()
-                    writeFileExts = vtk.vtkStringArray()
-                    store.GetFileExtensionsFromFileTypes(writeFileTypes, writeFileExts)
-                if writeFileExts.GetNumberOfValues() > 0:
-                    outputExtension = writeFileExts.GetValue(0)
-                else:
-                    raise Exception('Output extension not specified and unable to deduce a valid extension')
-        elif not outputExtension.startswith('.'):
-            outputExtension = '.' + outputExtension
+        #if outputExtension is None:
+        #    with ScopedNode(slicer.mrmlScene.AddNewNodeByClass(self._pipeline.returnType.__vtkname__)) as outputNode:
+        #        with ScopedDefaultStorageNode(outputNode) as store:
+        #            writeFileTypes = store.GetSupportedWriteFileTypes()
+        #            writeFileExts = vtk.vtkStringArray()
+        #            store.GetFileExtensionsFromFileTypes(writeFileTypes, writeFileExts)
+        #        if writeFileExts.GetNumberOfValues() > 0:
+        #            outputExtension = writeFileExts.GetValue(0)
+        #        else:
+        #            raise Exception('Output extension not specified and unable to deduce a valid extension')
+        #elif not outputExtension.startswith('.'):
+        #    outputExtension = '.' + outputExtension
 
-        self._outputExtension = outputExtension
+
+        #self._outputExtension = outputExtension
         self._progressHelper = self._ProgressHelper(0, 0)
 
     def setProgressCallback(self, progressCallback):
@@ -76,46 +82,32 @@ class PipelineCaseIteratorRunner(object):
         csvParameters = IteratorParameterFile(self._pipeline.parameters, inputFile=self._inputFile)
 
         # self._pipeline.SetProgressCallback(self._setPipelineProgress)
-
+        rowCount = 0
+        inputNodes = []
         for row in csvParameters:
             try:
-                inputParameters, nodes = self._convertRow(row, self._pipeline.parameters)
-                outputFilenames = self._createOutputFilePaths(row, self._pipeline.parameters, self._outputDirectory)
-                # TODO: Just pass the first output filename for now, but this will change
-                self._runOnce(self._pipeline, inputParameters, list(outputFilenames.values())[0])
+                inputParameters, inputNodes = self._rowToTypes(row, self._pipeline.parameters)
+                output = self._pipeline.function(**inputParameters)
+                self._writeNodes(output, rowCount, self._outputDirectory)
             except Exception as e:
                 print(f"Exception: {e}")
                 traceback.print_exc()
             finally:
-                for node in nodes:
+                rowCount = rowCount + 1
+                for node in inputNodes:
                     slicer.mrmlScene.RemoveNode(node)
-
             # self._pipeline.SetProgressCallback(None)
 
-    def _createOutputFilePaths(self, csvRow: dict[str, str], inputTypes: dict[str, typing.Any], outputDirectory: str) -> \
-    dict[str, str]:
-        """
-    Creates the output filepaths for the pipeline
-    """
-        # TODO currently still that there is only one output node per pipeline, but this will change
-        # we will need to look at the output parameter information and create the output filepaths accordingly
-        nodes = {}
-        for name, value in inputTypes.items():
-            if not issubclass(value, slicer.vtkMRMLNode):
-                continue
-            nodes[name] = csvRow[name]
-        return {name: self._createOutputFilepath(value, outputDirectory) for name, value in nodes.items()}
-
-    def _createOutputFilepath(self, inputFilename, outputDirectory):
+    def _createOutputFilepath(self, baseFilename, outputExtension, outputDirectory):
         # Get filename and strip extension
-        outputFilename = os.path.splitext(os.path.basename(inputFilename))[0]
+        outputFilename = os.path.splitext(os.path.basename(baseFilename))[0]
         if self._prefix is not None:
             outputFilename = self._prefix + outputFilename
         if self._suffix is not None:
             outputFilename = outputFilename + self._suffix
         if self._timestamp is not None:
             outputFilename = outputFilename + self._timestamp
-        outputFilename += self._outputExtension
+        outputFilename += outputExtension
         return os.path.join(outputDirectory, outputFilename)
 
     def _setPipelineProgress(self, pipelineProgress):
@@ -129,14 +121,14 @@ class PipelineCaseIteratorRunner(object):
                 currentNumber=self._progressHelper.currentFileIndex,
             ))
 
-    def _convertRow(self, csvRow: dict[str, str], inputTypes: dict[str, typing.Any]):
+    def _rowToTypes(self, csvRow: dict[str, str], inputTypes: dict[str, typing.Any]):
         """
-    Converts a row from the csv file to the correct types for the pipeline, 
-    and loads any nodes that are required.
-    Args:
-        csvRow (dict[str, str]): The row from the csv file
-        inputTypes (dict[str, typing.Any]): The types of the input parameters from the pipelineInfo
-    """
+        Converts a row from the csv file to the correct types for the pipeline,
+        and loads any nodes that are required.
+        Args:
+            csvRow (dict[str, str]): The row from the csv file
+            inputTypes (dict[str, typing.Any]): The types of the input parameters from the pipelineInfo
+        """
         parameters = {}
         nodes = []
         valid = True
@@ -159,7 +151,7 @@ class PipelineCaseIteratorRunner(object):
                 try:
                     parameters[name] = value(csvRow[name])
                 except ValueError:
-                    print(f"Could not cast {value} to {self._types[key]}")
+                    print(f"Could not cast {value} to {self._types[name]}")
                     valid = False
                     break
 
@@ -170,6 +162,37 @@ class PipelineCaseIteratorRunner(object):
             nodes = None
 
         return parameters, nodes
+
+    def _writeNodes(self, output, rowCount: int, outputDirectory: str):
+        """ Write out all the nodes in a given output, the output is either a single value that
+        or a could be a node or a parameterPack that contains nodes
+        """
+        nodes = {}
+        if isParameterPack(output):
+            for param in output.allParameters:
+                value = output.getValue(param)
+                if issubclass(value.__class__, slicer.vtkMRMLNode):
+                    nodes[param] = value
+        elif issubclass(output.__class__, slicer.vtkMRMLNode):
+            # TODO Should look up parameter name in Output type
+            nodes["returnValue"] = output
+
+        # Iterates over all nodes in the output, stores them to file
+        # additionally releases them after writing through the ScopedNode
+        for name, outputNode in nodes.items():
+            with ScopedNode(outputNode) as node:
+                with ScopedDefaultStorageNode(node) as storageNode:
+                    fileTypes = storageNode.GetSupportedWriteFileTypes()
+                    fileExtensions = vtk.vtkStringArray()
+                    storageNode.GetFileExtensionsFromFileTypes(fileTypes, fileExtensions)
+                    outputExtension = fileExtensions.GetValue(0)
+                    # TODO Figure out basename from pipeline
+                    outputFilename = self._createOutputFilepath(f'{name}_{rowCount:03d}',
+                                                                outputExtension,
+                                                                outputDirectory, )
+                    if not slicer.util.saveNode(node, outputFilename):
+                        print(f'Failed to write node {node} to disk at {outputFilename} \n'
+                              + 'Try checking the error log for more details')
 
     def _runOnce(self, pipeline: PipelineInfo, inputParameters, outputFilename):
         with ScopedNode(pipeline.function(**inputParameters)) as outputNode:
@@ -351,7 +374,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
 
         try:
             pipelineInfo = self.PipelineCreatorLogic.registeredPipelines[pipelineName]
-            self.logic.run(
+            self.logic.runSynchronously(
                 pipelineInfo=pipelineInfo,
                 inputFile=inputFile,
                 outputDirectory=outputDirectory,
