@@ -3,8 +3,6 @@ import typing
 import os
 from copy import copy
 
-import slicer.util
-
 import logging
 
 
@@ -12,7 +10,7 @@ class _IteratorParameterFileIterator(object):
     """
     Internal class used to iterate over the input rows
     """
-    def __init__(self, rows : list[dict[str, str]]) -> None:
+    def __init__(self, rows: list[dict[str, str]]) -> None:
         self._rows = copy(rows)
 
     def __iter__(self):
@@ -35,12 +33,11 @@ class IteratorParameterFile(object):
         - iterate over the input parameters
     """
 
-
-    def __init__(self, inputs : dict[str, typing.Any], inputFile = None, outputs = None) -> None : 
+    def __init__(self, inputs: dict[str, typing.Any], inputFile=None, outputs=None) -> None:
         self._inputs = inputs
         self._outputs = outputs
         self._headers = [f"{key}:{value.__name__}" for key, value in self._inputs.items()]
-        self._rows : list[dict[str, str]] = []
+        self._rows: list[dict[str, str]] = []
 
         if inputFile is not None:
             self._rows = self.readParameters(inputFile)
@@ -48,7 +45,7 @@ class IteratorParameterFile(object):
     def __iter__(self):
         return _IteratorParameterFileIterator(self._rows)
 
-    def _validate(self, parameters : list[dict[str, typing.Any]]) -> list[dict[str, typing.Any]]:
+    def _validate(self, parameters: list[dict[str, typing.Any]]) -> list[dict[str, typing.Any]]:
         validParameters = []
         for parameter in parameters:
             valid = True
@@ -66,13 +63,12 @@ class IteratorParameterFile(object):
 
         return validParameters
 
-
-    def createTemplate(self, fileName : str) -> bool :
-        with open(fileName, mode = "w+") as file:
+    def createTemplate(self, fileName: str):
+        with open(fileName, mode='w+') as file:
             writer = csv.writer(file)
             writer.writerow(self._headers)
 
-    def readParameters(self, fileName : str) -> list[dict[str, str]] :
+    def readParameters(self, fileName: str) -> list[dict[str, str]]:
         parameters = []
 
         with open(fileName) as file:
@@ -84,10 +80,8 @@ class IteratorParameterFile(object):
                 if len(row) != len(headers):
                     continue
                 else:
-                    parameters.append({key : value for key, value in zip(headers, row)})
+                    parameters.append({key: value for key, value in zip(headers, row)})
 
             self._rows = parameters
 
         return parameters
-    
-
