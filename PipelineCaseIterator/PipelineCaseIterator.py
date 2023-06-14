@@ -5,6 +5,7 @@ import re
 import subprocess
 import traceback
 import typing
+import csv
 
 from slicer.parameterNodeWrapper import (
     isParameterPack,
@@ -83,12 +84,14 @@ class PipelineCaseIteratorRunner(object):
 
         # self._pipeline.SetProgressCallback(self._setPipelineProgress)
         rowCount = 0
-        inputNodes = []
+        outputData = []
+
         for row in csvParameters:
             try:
                 inputParameters, inputNodes = self._rowToTypes(row, self._pipeline.parameters)
                 output = self._pipeline.function(**inputParameters)
-                self._writeNodes(output, rowCount, self._outputDirectory)
+                outputRow = self._writeNodes(output, rowCount, self._outputDirectory)
+                outputData.append(outputRow | row)
             except Exception as e:
                 print(f"Exception: {e}")
                 traceback.print_exc()
@@ -97,6 +100,19 @@ class PipelineCaseIteratorRunner(object):
                 for node in inputNodes:
                     slicer.mrmlScene.RemoveNode(node)
             # self._pipeline.SetProgressCallback(None)
+
+        self._writeResults(outputData, self._outputDirectory)
+
+    def _writeResults(self, data: list[dict[str, typing.Any]], outputDirectory: str):
+        filename = os.path.join(outputDirectory, "results.csv")
+        if not data:
+            return
+        fieldnames = data[0].keys()
+        with open(filename, mode='w+', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in data:
+                writer.writerow(row)
 
     def _createOutputFilepath(self, baseFilename, outputExtension, outputDirectory):
         # Get filename and strip extension
@@ -108,7 +124,7 @@ class PipelineCaseIteratorRunner(object):
         if self._timestamp is not None:
             outputFilename = outputFilename + self._timestamp
         outputFilename += outputExtension
-        return os.path.join(outputDirectory, outputFilename)
+        return os.path.normpath(os.path.join(outputDirectory, outputFilename))
 
     def _setPipelineProgress(self, pipelineProgress):
         currentPipelineProgress = pipelineProgress.progress * 100
@@ -132,13 +148,12 @@ class PipelineCaseIteratorRunner(object):
         parameters = {}
         nodes = []
         valid = True
-        for name, value in inputTypes.items():
+        for name, paramType in inputTypes.items():
             if name == "delete_intermediate_nodes":
                 continue
             # Verify if
-            if issubclass(value, slicer.vtkMRMLNode):
-                # TODO: Handle loading error
-                inputNode = slicer.mrmlScene.AddNewNodeByClass(value.__name__)
+            if issubclass(paramType, slicer.vtkMRMLNode):
+                inputNode = slicer.mrmlScene.AddNewNodeByClass(paramType.__name__)
                 nodes.append(inputNode)
                 with ScopedDefaultStorageNode(inputNode) as store:
                     store.SetFileName(csvRow[name])
@@ -149,9 +164,9 @@ class PipelineCaseIteratorRunner(object):
                 parameters[name] = inputNode
             else:
                 try:
-                    parameters[name] = value(csvRow[name])
+                    parameters[name] = paramType(csvRow[name])
                 except ValueError:
-                    print(f"Could not cast {value} to {self._types[name]}")
+                    print(f"Could not cast {csvRow[name]} to {paramType.__name__}")
                     valid = False
                     break
 
@@ -168,11 +183,15 @@ class PipelineCaseIteratorRunner(object):
         or a could be a node or a parameterPack that contains nodes
         """
         nodes = {}
+        outputRow = {}
+
         if isParameterPack(output):
             for param in output.allParameters:
                 value = output.getValue(param)
                 if issubclass(value.__class__, slicer.vtkMRMLNode):
                     nodes[param] = value
+                else:
+                    outputRow[param] = output.getValue(param)
         elif issubclass(output.__class__, slicer.vtkMRMLNode):
             # TODO Should look up parameter name in Output type
             nodes["returnValue"] = output
@@ -187,24 +206,15 @@ class PipelineCaseIteratorRunner(object):
                     storageNode.GetFileExtensionsFromFileTypes(fileTypes, fileExtensions)
                     outputExtension = fileExtensions.GetValue(0)
                     # TODO Figure out basename from pipeline
-                    outputFilename = self._createOutputFilepath(f'{name}_{rowCount:03d}',
+                    outputFilepath = self._createOutputFilepath(f'{name}_{rowCount:03d}',
                                                                 outputExtension,
                                                                 outputDirectory, )
-                    if not slicer.util.saveNode(node, outputFilename):
-                        print(f'Failed to write node {node} to disk at {outputFilename} \n'
+                    if slicer.util.saveNode(node, outputFilepath):
+                        outputRow[name] = outputFilepath
+                    else:
+                        print(f'Failed to write node {node} to disk at {outputFilepath} \n'
                               + 'Try checking the error log for more details')
-
-    def _runOnce(self, pipeline: PipelineInfo, inputParameters, outputFilename):
-        with ScopedNode(pipeline.function(**inputParameters)) as outputNode:
-            success = slicer.util.saveNode(outputNode, outputFilename)
-            if not success:
-                raise Exception(
-                    'Failed to save node to file: ' + outputFilename + '\nTry checking the error log for more details')
-    # 
-    # TODO Distribute out parameters to output files, and write csv file with all parameters
-    # TODO Remove input nodes from scene
-
-
+        return outputRow
 #
 # PipelineCaseIterator
 #
@@ -374,7 +384,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
 
         try:
             pipelineInfo = self.PipelineCreatorLogic.registeredPipelines[pipelineName]
-            self.logic.runSynchronously(
+            self.logic.run(
                 pipelineInfo=pipelineInfo,
                 inputFile=inputFile,
                 outputDirectory=outputDirectory,
