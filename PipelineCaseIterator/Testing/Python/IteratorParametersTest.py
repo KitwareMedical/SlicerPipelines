@@ -2,8 +2,9 @@ import unittest
 import typing
 import tempfile
 import csv
+import os
 
-from PipelineCaseIterator.Library.IteratorParameterFile import IteratorParameterFile
+from PipelineCaseIteratorLibrary import IteratorParameterFile
 
 
 class IteratorParametersTest(unittest.TestCase):

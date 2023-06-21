@@ -20,7 +20,7 @@ import vtk, qt, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 from PipelineCreator import PipelineCreatorLogic
-from Library import *
+from PipelineCaseIteratorLibrary import *
 
 # overall - int 0-100 with current overall progress
 # currentPipeline - int 0-100 with progress of currently running pipeline
