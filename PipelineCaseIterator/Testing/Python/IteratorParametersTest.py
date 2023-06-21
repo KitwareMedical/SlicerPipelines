@@ -65,6 +65,26 @@ class IteratorParametersTest(unittest.TestCase):
 
         self.assertEqual(expectedParameters, parametersRead)
 
+    def testValidate(self):
+        inputParameters: dict[str, typing.Annotated] = {'param1': str, 'param2': float}
+        parameters = IteratorParameterFile(inputParameters)
+
+        validFile = os.path.join(self._tempDirectory.name, 'valid.csv')
+        with open(validFile, mode='w+') as file:
+            writer = csv.writer(file)
+            writer.writerow(['param1', 'param2:float', 'param3:str'])
+            writer.writerow(['param1', '1.0'])
+            writer.writerow(['param2', '2.0'])
+            writer.writerow(['param3', '2.0'])
+        self.assertTrue(parameters.validate(validFile))
+
+        invalidFile = os.path.join(self._tempDirectory.name, 'invalid.csv')
+        with open(invalidFile, mode='w+') as file:
+            writer = csv.writer(file)
+            writer.writerow(['param1', 'param3:float'])
+            writer.writerow(['param1', '1.0'])
+            writer.writerow(['param3', '2.0'])
+        self.assertFalse(parameters.validate(invalidFile))
 
 if __name__ == '__main__':
     unittest.main()
