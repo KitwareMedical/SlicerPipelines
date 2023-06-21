@@ -63,7 +63,6 @@ class IteratorParameterFile(object):
         be stripped of the type notation
         """
         inputNames = [key for key, value in self._inputs.items() if key not in self._ignores]
-        print(f'InputNames : {inputNames}\nHeaders : {fileHeaders}')
         return all([value in fileHeaders for value in inputNames])
 
     def createTemplate(self, fileName: str):
