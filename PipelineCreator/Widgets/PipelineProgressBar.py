@@ -36,6 +36,8 @@ class PipelineProgressCallback:
                        numberOfPieces: int) -> None:
         """
         Updates the progress report and calls the callback, if any is set.
+        Note: in general we use this call with currentPipelinePieceNumber == numberOfPieces
+        to indicate totalProgress == 1.0
         """
         perPieceVal = 1.0 / numberOfPieces
         self.totalProgress = perPieceVal * currentPipelinePieceNumber + perPieceVal * pieceProgress
