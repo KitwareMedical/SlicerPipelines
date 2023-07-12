@@ -1,9 +1,6 @@
 import csv
 import typing
-import os
 from copy import copy
-
-import logging
 
 
 class _IteratorParameterFileIterator(object):
@@ -46,7 +43,10 @@ class IteratorParameterFile(object):
     def __iter__(self):
         return _IteratorParameterFileIterator(self._rows)
 
-    def validate(self, fileName : str) -> bool:
+    def __len__(self):
+        return len(self._rows)
+
+    def validate(self, fileName: str) -> bool:
         """Validates a file"""
         with open(fileName) as file:
             reader = csv.reader(file)

@@ -219,6 +219,8 @@ def _generateRunFunction(pipeline: nx.DiGraph,
 {tab}{tab}if delete_intermediate_nodes:
 {textwrap.indent(intermediateMRMLNodesDeletion, tab * 3)}
 
+# By reporting (0, numSteps, numSteps) we indicate that the pipeline 
+# is finished 
 {tab}progress_callback.reportProgress("", 0, {numSteps}, {numSteps})
 
 {tab}{returnStatement}"""

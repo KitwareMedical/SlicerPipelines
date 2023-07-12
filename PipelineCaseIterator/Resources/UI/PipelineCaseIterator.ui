@@ -85,52 +85,15 @@
    </item>
    <item>
     <layout class="QFormLayout" name="formLayout">
-     <item row="3" column="0">
-      <widget class="QLabel" name="label_4">
+     <item row="0" column="0">
+      <widget class="QLabel" name="label_6">
        <property name="text">
-        <string>Overall Progress</string>
+        <string>Output Extension</string>
        </property>
       </widget>
      </item>
-     <item row="4" column="0">
-      <widget class="QLabel" name="label_5">
-       <property name="text">
-        <string>Pipeline Progress</string>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="1">
-      <widget class="QProgressBar" name="overallProgressBar">
-       <property name="value">
-        <number>0</number>
-       </property>
-       <property name="format">
-        <string>%p% (0/0)</string>
-       </property>
-      </widget>
-     </item>
-     <item row="4" column="1">
-      <widget class="QProgressBar" name="pipelineProgressBar">
-       <property name="value">
-        <number>0</number>
-       </property>
-       <property name="textVisible">
-        <bool>true</bool>
-       </property>
-       <property name="invertedAppearance">
-        <bool>false</bool>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="label_8">
-       <property name="text">
-        <string>Output Suffix</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="1">
-      <widget class="QLineEdit" name="outputSuffixLineEdit">
+     <item row="0" column="1">
+      <widget class="QLineEdit" name="outputExtensionLineEdit">
        <property name="placeholderText">
         <string>optional</string>
        </property>
@@ -150,28 +113,45 @@
        </property>
       </widget>
      </item>
-     <item row="0" column="0">
-      <widget class="QLabel" name="label_6">
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_8">
        <property name="text">
-        <string>Output Extension</string>
+        <string>Output Suffix</string>
        </property>
       </widget>
      </item>
-     <item row="0" column="1">
-      <widget class="QLineEdit" name="outputExtensionLineEdit">
+     <item row="2" column="1">
+      <widget class="QLineEdit" name="outputSuffixLineEdit">
        <property name="placeholderText">
         <string>optional</string>
        </property>
       </widget>
      </item>
-     <item row="5" column="0">
+     <item row="3" column="0">
+      <widget class="QLabel" name="label_4">
+       <property name="text">
+        <string>Overall Progress</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="1">
+      <widget class="QProgressBar" name="overallProgressBar">
+       <property name="value">
+        <number>0</number>
+       </property>
+       <property name="format">
+        <string>%p% (0/0)</string>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="0">
       <widget class="QLabel" name="label_9">
        <property name="text">
         <string>Add Timestamp</string>
        </property>
       </widget>
      </item>
-     <item row="5" column="1">
+     <item row="4" column="1">
       <widget class="QCheckBox" name="addTimestampCheckbox">
        <property name="text">
         <string/>
