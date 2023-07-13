@@ -233,7 +233,15 @@ class PipelineCaseIterator(ScriptedLoadableModule):
         self.parent.dependencies = ["PipelineCreator"]
         self.parent.contributors = ["Connor Bowley (Kitware, Inc.), Harald Scheirich (Kitware, Inc.)"]
         self.parent.helpText = """
-This module allows running a pipeline over multiple files in a directory and output the results in another directory.
+<p>The case iterator lets you repeat the same pipeline operation over a any amount of data. To operate it follow the following steps:</p>
+<ol>
+<li>Select a pipeline that you want to execute</li>
+<li>Write a template input file. This will create a `.csv` file that has a column for each input parameter for the given pipeline. Each row in the input file will trigger one iteration of the pipeline with the given data. For each row every column has to be filled out. If the input data is a node, the entry should be a path to the data for that node</li>
+<li>Select a directory for the output. The output will consist in another `.csv` file that contains all the input and output data for that run, whenever a node is in the resulting data of a run the appropriate path will be in the output .csv file.</li>
+<li>Optionally choose whether you want to prepend, append fixed strings to the output data or add a timestamp. The timestamp will be the time of the beginning of the run, this means that all output date from one run will have the same timestamp.</li>
+<li>Press "Run", this will start executing the pipeline with the given data. When you press run a second copy of slicer will be started to do the actual calculation. if all or part of a given data for a pass it will be skipped and a message will show in the console. The progress of the run can be seen in the progress bar. You can always abort a run using the "Cancel" button.</li>
+</ol>
+<p>Note: When creating a template `.csv` file, each column name will show the name for the given parameter and its type</p>
 """
         self.parent.acknowledgementText = "This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT."
 
