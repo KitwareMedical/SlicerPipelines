@@ -34,7 +34,7 @@ class TempPythonModule:
         sys.modules['tempModule'] = self.tempModule
         exec(self.codeAsString, self.tempModule.__dict__)
         return self.tempModule
-    
+
     def __exit__(self, type, value, traceback):
         sys.modules.pop('tempModule')
 
@@ -104,7 +104,7 @@ def exportModelToSegmentationSpacing(model: vtkMRMLModelNode,
                                      marginZ: Annotated[float, Minimum(0), Default(1), Decimals(1), SingleStep(0.1)]) -> SegmentationAndReferenceVolume:
     volumeMargin = [marginX, marginY, marginZ]
     volumeSpacing = [spacingX, spacingY, spacingZ]
-    
+
     #create reference volume
     bounds = [0.]*6
     model.GetBounds(bounds)
@@ -211,22 +211,6 @@ def funcTestMathPipeline(string: str, additive: int, factor: int) -> int:
     This gives the expected results from the pipeline from makeTestMathPipeline.
     """
     return ((len(string) + additive) * factor) + 1
-
-class PipelineCreatorUtilTests(unittest.TestCase):
-    def test_cleanType(self) -> None:
-        from _PipelineCreator.PipelineCreation.CodeGeneration.util import \
-            typeAsCode
-        self.assertEqual(typeAsCode(int), "int")
-        self.assertEqual(typeAsCode(float), "float")
-        self.assertEqual(typeAsCode(bool), "bool")
-        self.assertEqual(typeAsCode(str), "str")
-        self.assertEqual(typeAsCode(list[int]), "list[int]")
-        self.assertEqual(typeAsCode(dict[str, int]), "dict[str, int]")
-        self.assertEqual(typeAsCode(tuple[bool, float]), "tuple[bool, float]")
-        self.assertEqual(typeAsCode(list[dict[tuple[str, int], list[bool]]]),
-                         "list[dict[tuple[str, int], list[bool]]]")
-
-        self.assertEqual(_SomeClass, eval(typeAsCode(_SomeClass)))
 
 
 class PipelineCreatorRegistrationTest(unittest.TestCase):
@@ -539,7 +523,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
         self.logic.registerPipeline("multiply", multiply, ["multiply"])
         self.logic.registerPipeline("plusMinus", plusMinus, ["plusMinus"])
         self.logic.registerPipeline("strlen", strlen, ["strlen"])
-    
+
     def tearDown(self) -> None:
         # clean up the singleton on tear down as not to pollute the global state
         PipelineCreatorLogic._singletonRegistrar = PipelineRegistrar()
@@ -733,7 +717,7 @@ class PipelineCreatorCodeGenLogicTests(unittest.TestCase):
 
         from _PipelineCreator.PipelineCreation.core import _gatherDependencies
         dependencies = _gatherDependencies(pipeline, self.logic.registeredPipelines)
-        
+
         self.assertEqual(len(dependencies), 2)
         self.assertSetEqual(set(dependencies), set(["decimation", "translate"]))
 

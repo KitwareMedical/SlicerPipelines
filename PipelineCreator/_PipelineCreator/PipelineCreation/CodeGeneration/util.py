@@ -3,8 +3,8 @@ import pickle
 import typing
 
 import networkx as nx
-
 from slicer import vtkMRMLNode
+from slicer.parameterNodeWrapper import splitAnnotations
 
 @dataclasses.dataclass
 class CodePiece:
@@ -61,9 +61,23 @@ def typeAsCode(type_: type) -> str:
     return f"pickle.loads({pickle.dumps(type_)})"
 
 
+def annotatedAsCode(annotations: typing.Annotated) -> str:
+    actualType, annotations = splitAnnotations(annotations)
+    if len(annotations) == 0:
+        return typeAsCode(actualType)
+
+    result = "Annotated["
+    result += typeAsCode(actualType) + ", "
+    for annotation in annotations:
+        result += annotation.__repr__() + ", "
+
+    result = result[:-2] + "]"  # remove last ", "
+    return result
+
+
 def valueAsCode(value) -> str:
     """
-    The only goal of this is to improve generated code readability 
+    The only goal of this is to improve generated code readability
     (and even that is mostly for testing)
     """
     type_ = type(value)
