@@ -1,34 +1,12 @@
+from typing import Optional, Annotated
+from inspect import isclass
 import dataclasses
+
 import qt
 
-from typing import Optional
-
+from Widgets.Types import Reference
 from slicer.parameterNodeWrapper import unannotatedType
 
-@dataclasses.dataclass
-class Reference:
-    """
-    A reference to an intermediate output.
-
-    Note: the overall inputs count as intermediate outputs because they can be used as
-    inputs to subsequent steps.
-    """
-    # Identifying pieces. Cannot change.
-    obj: object
-    id: int
-
-    # Informational pieces. Can change.
-    step: int
-    stepName: str
-    itemName: str
-    type: type
-
-    def __eq__(self, other) -> bool:
-        return isinstance(other, Reference) and self.obj == other.obj and self.id == other.id
-
-    @property
-    def name(self) -> str:
-        return f"step{self.step}_{self.stepName}_{self.itemName}"
 
 class ReferenceComboBox(qt.QWidget):
     """
@@ -36,7 +14,8 @@ class ReferenceComboBox(qt.QWidget):
     It is always possible to choose None because the best default action is to not make assumptions.
     Before the final pipeline is actually generated, a non-None choice will need to be made.
     """
-    currentIndexChanged = qt.Signal()
+
+    referenceChanged = qt.Signal()
 
     def __init__(self, paramType: Optional[type]=None, references=None, parent=None):
         """
@@ -51,10 +30,16 @@ class ReferenceComboBox(qt.QWidget):
 
         self._layout = qt.QVBoxLayout(self)
         self._combobox = qt.QComboBox()
+        self._combobox.currentIndexChanged.connect(self._onComboBoxIndexChanged)
         self._layout.addWidget(self._combobox)
+
 
         # note: this is running through the property setter
         self.references = references or []
+
+    def reset(self) -> None:
+        #doesn't seem to trigger index changed signal
+        self._combobox.setCurrentIndex(0)
 
     @property
     def paramType(self) -> type:
@@ -70,6 +55,9 @@ class ReferenceComboBox(qt.QWidget):
         """
         return self._inputReferences[1:]
 
+    def _onComboBoxIndexChanged(self, index):
+        self.referenceChanged.emit()
+
     @references.setter
     def references(self, references: list[Reference]):
         """
@@ -78,23 +66,51 @@ class ReferenceComboBox(qt.QWidget):
         If the currentReference is not in the new list, None will be chosen.
         """
         currentRef = self.currentReference
+        isBlocking = self._combobox.blockSignals(True)
 
-        unannotatedParamType = unannotatedType(self.paramType)
+        unannotatedParamType = unannotatedType(self._paramType)
+
+        #self._inputReferences = [None] + references
+
+        inputReferences = [None]
+
+        #for r in references:
+        #    self._inputReferences.append(r)
+
         if unannotatedParamType == type(None):
-            self._inputReferences = [None] + references
+            inputReferences += references
         else:
-            self._inputReferences = [None] + [r for r in references if issubclass(r.type, unannotatedParamType)]
+            for r in references:
+                # Filters all the references that _could_ be shown to what should be shown
+                # The following are eligible
+                # - References that don't have a type
+                # - The reference that is the current one
+                # - Any annotated type whose base type is the same as "mine"
+                # - Any type that is a subclass of "mine" (Nodes)
+                if r.type == type(None):
+                    inputReferences.append(r)
+                elif self.currentReference == r:
+                    inputReferences.append(r)
+                else:
+                    if (issubclass(unannotatedType(r.type), unannotatedParamType)):
+                        inputReferences.append(r)
+
+        self._inputReferences = inputReferences
 
         self._combobox.clear()
         self._combobox.addItem("")
         for ref in self._inputReferences[1:]:
             self._combobox.addItem(ref.name)
-
         try:
             i = self._inputReferences.index(currentRef)
             self._combobox.currentIndex = i
         except ValueError:
             pass
+
+        if currentRef != self.currentReference:
+            self.referenceChanged.emit()
+
+        self._combobox.blockSignals(isBlocking)
 
     @property
     def currentReference(self) -> Optional[Reference]:

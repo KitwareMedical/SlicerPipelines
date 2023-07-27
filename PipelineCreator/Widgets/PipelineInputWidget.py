@@ -1,7 +1,14 @@
 import qt
 import ctk
 
-from Widgets.ReferenceComboBox import Reference
+from typing import Optional, Annotated, get_origin
+
+from _PipelineCreator.PipelineCreation.CodeGeneration.util import annotatedAsCode
+from slicer.parameterNodeWrapper import unannotatedType
+from slicer import vtkMRMLNode
+
+
+from Widgets.Types import Reference, PipelineParameter
 
 class PipelineInputParameterWidget(qt.QWidget):
     """
@@ -10,7 +17,7 @@ class PipelineInputParameterWidget(qt.QWidget):
     valueChanged = qt.Signal()
     requestedDelete = qt.Signal()
 
-    def __init__(self, id_: int, stepNumber: int, name: str, availableTypes: list[type]=None, type_: type = None, parent=None):
+    def __init__(self, id: int, stepNumber: int, name: str, availableTypes: list[type]=None, type_: type = None, parent=None):
         """
         id_ - An unique identifier for this overall input parameter. Will be used for identifying this parameter's reference.
         stepNumber - Should always be 0 because this is an overall input.
@@ -21,28 +28,68 @@ class PipelineInputParameterWidget(qt.QWidget):
         """
         qt.QWidget.__init__(self, parent)
 
-        self.id = id_
+        self.id = id
         self.stepNumber = stepNumber
         self._availableTypes = availableTypes
+        self._referencing: list[PipelineParameter] = []
+        self._type = type(None)
 
         self._mainLayout = qt.QHBoxLayout(self)
 
         self.nameWidget = qt.QLineEdit(name)
         self.nameWidget.textChanged.connect(self._emitValueChanged)
-
-        self.typesWidget = qt.QComboBox()
-        self.typesWidget.sizePolicy = qt.QSizePolicy(qt.QSizePolicy.Expanding, qt.QSizePolicy.Fixed)
-        self._updateTypes()
-        if type_ is not None:
-            self.typesWidget.currentIndex = self.availableTypes.index(type_)
-        self.typesWidget.currentIndexChanged.connect(self._emitValueChanged)
+        self.typeLabel = qt.QLabel()
+        self.typeLabel.sizePolicy = qt.QSizePolicy(qt.QSizePolicy.Expanding, qt.QSizePolicy.Fixed)
 
         self.deleteButton = qt.QPushButton(qt.QIcon(":/Icons/MarkupsDelete.png"), "")
         self.deleteButton.clicked.connect(self._emitRequestedDelete)
 
         self._mainLayout.addWidget(self.nameWidget)
-        self._mainLayout.addWidget(self.typesWidget)
+        self._mainLayout.addWidget(self.typeLabel)
         self._mainLayout.addWidget(self.deleteButton)
+
+    def addReferencing(self, pipelineParameter: PipelineParameter):
+        """Adds a reference _from_ widget to this, types have to match"""
+        if (self.type != type(None) and unannotatedType(self.type) != unannotatedType(pipelineParameter.type)):
+            raise TypeError(f"Parameter {self.nameWidget.text} does not have the same type as {pipelineParameter}")
+
+        if not pipelineParameter in self._referencing:
+            self._referencing.append(pipelineParameter)
+
+        if self.type == type(None):
+            self.type = pipelineParameter.type
+            self.valueChanged.emit()
+
+    def removeReferencing(self, pipelineParameter: PipelineParameter):
+        if pipelineParameter in self._referencing:
+            self._referencing.remove(pipelineParameter)
+
+        if len(self._referencing) == 0:
+            self.type = type(None)
+            self.valueChanged.emit()
+
+    def _updateTypeLabel(self, paramType : type) -> None:
+        """Try and give the user a reasonable description of the type
+        assigned to this input parameter"""
+        if paramType == type(None):
+            self.typeLabel.text = ""
+        else:
+            if get_origin(paramType) is Annotated or issubclass(paramType, vtkMRMLNode):
+                text = annotatedAsCode(paramType)
+                if len(text) > 50:
+                    text = text[:46] + " ..."
+                self.typeLabel.text = text
+            else:
+                self.typeLabel.text = paramType.__class__.__name__
+
+    @property
+    def type(self) -> type:
+        return self._type
+
+    @type.setter
+    def type(self, type: type) -> None:
+        self._type = type
+        self._updateTypeLabel(self._type)
 
     @property
     def availableTypes(self) -> list[type]:
@@ -58,7 +105,7 @@ class PipelineInputParameterWidget(qt.QWidget):
         """
         Get the reference that will link to value described by this widget.
         """
-        return Reference(self, self.id, self.stepNumber, None, self.nameWidget.text, self.availableTypes[self.typesWidget.currentIndex])
+        return Reference(self, self.id, self.stepNumber, None, self.nameWidget.text, self._type)
 
     def _emitValueChanged(self) -> None:
         self.valueChanged.emit()
@@ -66,18 +113,6 @@ class PipelineInputParameterWidget(qt.QWidget):
     def _emitRequestedDelete(self) -> None:
         self.requestedDelete.emit()
 
-    def _updateTypes(self):
-        """
-        Updates the typesWidget with new types to choose from.
-        Completely replaces the old list.
-        """
-        text = self.typesWidget.currentText
-        typesAsStrs = [t.__name__ for t in self.availableTypes]
-        self.typesWidget.clear()
-        self.typesWidget.addItems(typesAsStrs)
-        # set to what it was before, if it is still there
-        self.typesWidget.currentText = text
-        self._emitValueChanged()
 
 
 class PipelineInputWidget(qt.QWidget):
@@ -122,6 +157,29 @@ class PipelineInputWidget(qt.QWidget):
 
         self._setupInputContainer()
 
+    def addReferencing(self, reference: Reference, pipelineParameter: PipelineParameter):
+        """Sets the widget up as referencing the parameter"""
+        # TODO Check if we can use `id`
+        if not reference:
+            return
+        inputWidget = self._findWidgetFor(reference)
+        if inputWidget:
+            inputWidget.addReferencing(pipelineParameter)
+
+    def removeReferencing(self, reference: Reference, pipelineParameter: PipelineParameter):
+        """Forward to the appropriate parameter"""
+        if not reference:
+            return
+        inputWidget = self._findWidgetFor(reference)
+        if inputWidget:
+            inputWidget.removeReferencing(pipelineParameter)
+
+    def _findWidgetFor(self, reference: Reference) -> Optional[PipelineInputParameterWidget]:
+        for widget in self._parameterWidgets:
+            if reference == widget.reference:
+                return widget
+        return None
+
     @property
     def _parameterWidgets(self) -> list[PipelineInputParameterWidget]:
         layout = self._parameterContainer.layout()
@@ -156,7 +214,7 @@ class PipelineInputWidget(qt.QWidget):
     def _emitValueChanged(self) -> None:
         self.valueChanged.emit()
 
-    def _addParameter(self, name=None, type_=None) -> None:
+    def _addParameter(self, name=None, type_= type(None)) -> None:
         """
         Adds a new input parameter.
         If name and type are not None, they will be used for the new parameter.

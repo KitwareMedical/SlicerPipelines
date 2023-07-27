@@ -15,7 +15,9 @@ from slicer.parameterNodeWrapper import (
     Default
 )
 from _PipelineCreator.PipelineRegistrar import PipelineInfo
-from Widgets.ReferenceComboBox import Reference, ReferenceComboBox
+from Widgets.Types import Reference, PipelineParameter
+from Widgets.ReferenceComboBox import  ReferenceComboBox
+from Widgets.PipelineInputWidget import PipelineInputWidget
 
 @dataclasses.dataclass
 class PipelineStepParameterWidget(qt.QWidget):
@@ -31,21 +33,31 @@ class PipelineStepParameterWidget(qt.QWidget):
     This duck type matches PipelineOutputParameterWidget.
     """
 
-    nameWidget: qt.QLabel = None
+    nameLabel: qt.QLabel = None
     fixedCheckBox: qt.QCheckBox = None
     referenceComboBox: ReferenceComboBox = None
     fixedValueWidget: qt.QWidget = None
 
+    updated = qt.Signal()
+
     def __init__(self, grid: qt.QGridLayout, index : int, paramName: str, paramType: type, parent= None):
             super().__init__(parent)
-            unannotatedParamType = unannotatedType(paramType)
+
+            self._paramName = paramName
+            self._paramType = paramType
+            self._id = index
+
             self.nameLabel = qt.QLabel(paramName)
+
+            self._previousReference: Reference = None
+            self._currentReference: Reference = None
+
 
             self.referenceComboBox = ReferenceComboBox(paramType)
             refSizePolicy = self.referenceComboBox.sizePolicy
             refSizePolicy.setRetainSizeWhenHidden(True)
             self.referenceComboBox.setSizePolicy(refSizePolicy)
-
+            self.referenceComboBox.referenceChanged.connect(self._onComboBoxIndexChanged)
             grid.addWidget(self.nameLabel, index, 0)
             grid.addWidget(self.referenceComboBox, index, 1)
 
@@ -53,6 +65,7 @@ class PipelineStepParameterWidget(qt.QWidget):
             self.fixedCheckBox.checked = True
             grid.addWidget(self.fixedCheckBox, index, 2)
 
+            unannotatedParamType = unannotatedType(paramType)
             if not (isinstance(unannotatedParamType, type) and issubclass(unannotatedParamType, slicer.vtkMRMLNode)):
                 self.fixedValueWidget = createGui(paramType)
                 # use a connector to set things like Decimals, Minimum, etc, then use to set the default
@@ -75,12 +88,21 @@ class PipelineStepParameterWidget(qt.QWidget):
                 self.fixedCheckBox.hide()
 
     def _onFixedChecked(self):
-        self.referenceComboBox.visible = not self.fixedCheckBox.checked
-        self.fixedValueWidget.visible = self.fixedCheckBox.checked
+        checked = self.fixedCheckBox.checked
+        self.referenceComboBox.visible = not checked
+        self.fixedValueWidget.visible = checked
+        if not checked:
+            self.referenceComboBox.reset()
+        self.updated.emit()
+
+    def _onComboBoxIndexChanged(self):
+        self._previousReference = self._currentReference
+        self._currentReference = self.referenceComboBox.currentReference
+        self.updated.emit()
 
     @property
     def name(self) -> str:
-        return self.nameWidget.text
+        return self.nameLabel.text
 
     @property
     def fixed(self) -> bool:
@@ -90,9 +112,19 @@ class PipelineStepParameterWidget(qt.QWidget):
     def type(self) -> type:
         return self.referenceComboBox.paramType
 
+    def parameter(self) -> PipelineParameter:
+        """
+        Get the reference that will link to value described by this widget.
+        """
+        return PipelineParameter(self, self._id, self._paramName, self._paramType)
+
     @property
-    def currentReference(self) -> Reference:
-        return self.referenceComboBox.currentReference
+    def previousReference(self) -> typing.Optional[Reference]:
+        return self._previousReference
+
+    @property
+    def currentReference(self) -> typing.Optional[Reference]:
+        return self._currentReference
 
     def computeFixedValue(self) -> typing.Any:
         # to get a generic value from a generic widget, make a GUI connector!
@@ -113,11 +145,16 @@ class PipelineStepWidget(qt.QWidget):
     requestedMoveDown = qt.Signal()
     requestedDelete = qt.Signal()
 
-    def __init__(self, titleText, stepNum, info: PipelineInfo, parent=None) -> None:
+    referenceSelected = qt.Signal(Reference, Reference)
+    referenceRemoved = qt.Signal(Reference)
+    referenceAdded = qt.Signal(Reference)
+
+    def __init__(self, titleText, stepNum, inputsWidget: PipelineInputWidget, info: PipelineInfo, parent=None) -> None:
         super().__init__(parent)
 
         self.stepInfo: PipelineInfo = info
         self._stepNumber = stepNum
+        self._inputsWidget = inputsWidget
 
         self._mainLayout = qt.QVBoxLayout(self)
 
@@ -152,6 +189,8 @@ class PipelineStepWidget(qt.QWidget):
 
         # pipeline stuff
         self._collapsibleButton.layout().addWidget(qt.QLabel("Inputs"))
+        self._inputReferenceComboboxes = [] # All of the references offered by the rest of the pipeline
+        self._parameterWidgets: PipelineStepParameterWidget = []
         self._setupParameterWidgets()
         self._collapsibleButton.layout().addWidget(qt.QLabel("Outputs"))
         self._setupReturnWidgets()
@@ -184,8 +223,13 @@ class PipelineStepWidget(qt.QWidget):
         self._collapsibleButton.text = f"Step {self._stepNumber} - {self.stepInfo.name}"
 
     def updateInputReferences(self, inputReferences) -> None:
-        for referenceCombobox in self._inputReferences:
+        for referenceCombobox in self._inputReferenceComboboxes:
             referenceCombobox.references = inputReferences
+
+
+    def onRemoveStep(self) -> None:
+        for widget in self._parameterWidgets:
+            self._inputsWidget.removeReferencing(widget.currentReference, widget.parameter())
 
     def _setupParameterWidgets(self) -> None:
         grid = qt.QGridLayout()
@@ -195,12 +239,34 @@ class PipelineStepWidget(qt.QWidget):
         grid.setColumnStretch(1, 1)
         self._collapsibleButton.layout().addLayout(grid)
 
-        self._inputReferences = []
-        self._parameterWidgets = []
+        # Util function for capturing index and "self"
+        def referenceUpdatedLambda(widget : PipelineStepWidget, index : int) :
+            return lambda: widget._onReferenceUpdated(index)
+
         for index, (paramName, paramType) in enumerate(self.stepInfo.parameters.items()):
             widget = PipelineStepParameterWidget(grid, index, paramName, paramType)
             self._parameterWidgets.append(widget)
-            self._inputReferences.append(widget.referenceComboBox)
+            self._inputReferenceComboboxes.append(widget.referenceComboBox)
+
+            widget.updated.connect(referenceUpdatedLambda(self, index))
+
+    def _onReferenceUpdated(self, index : int):
+        """The reference in THIS widget was updated, check with inputs if anything needs
+        to change"""
+        widget = self._parameterWidgets[index]
+        pipelineParameter = widget.parameter()
+
+        # Some oddity with catching updates on the fixed toggle
+        # while the combobox is changed the signal chain is not executed correctly/at all
+        # This should trigger when moving from not fixed to fixed
+        if widget.fixed:
+            self._inputsWidget.removeReferencing(widget.currentReference, pipelineParameter)
+            return
+
+        self._inputsWidget.removeReferencing(widget.previousReference, pipelineParameter)
+        if widget.fixed or widget.currentReference is None:
+            return
+        self._inputsWidget.addReferencing(widget.currentReference, pipelineParameter)
 
     def _setupReturnWidgets(self) -> None:
         grid = qt.QGridLayout()
