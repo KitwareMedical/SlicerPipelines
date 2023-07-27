@@ -1,7 +1,8 @@
 import qt
 import ctk
 
-from Widgets.ReferenceComboBox import ReferenceComboBox, Reference
+from Widgets.Types import Reference
+from Widgets.ReferenceComboBox import ReferenceComboBox
 
 class PipelineOutputParameterWidget(qt.QWidget):
     """
@@ -26,7 +27,7 @@ class PipelineOutputParameterWidget(qt.QWidget):
 
         self.referenceWidget = ReferenceComboBox()
         self.referenceWidget.sizePolicy = qt.QSizePolicy(qt.QSizePolicy.Expanding, qt.QSizePolicy.Fixed)
-        self.referenceWidget.currentIndexChanged.connect(self._emitValueChanged)
+        self.referenceWidget.referenceChanged.connect(self._emitValueChanged)
 
         self.deleteButton = qt.QPushButton(qt.QIcon(":/Icons/MarkupsDelete.png"), "")
         self.deleteButton.clicked.connect(self._emitRequestedDelete)
@@ -115,6 +116,11 @@ class PipelineOutputWidget(qt.QWidget):
 
     def _emitValueChanged(self):
         self.valueChanged.emit()
+
+    @property
+    def stepOutputs(self) -> list[Reference]:
+        """The output widget doesn't have any outputs"""
+        return []
 
     @property
     def _parameterWidgets(self) -> list[PipelineOutputParameterWidget]:

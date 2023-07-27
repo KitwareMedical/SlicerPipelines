@@ -23,7 +23,7 @@ from slicer.parameterNodeWrapper import (
 
 from _PipelineCreator.PipelineRegistrar import PipelineRegistrar, PipelineInfo
 
-from Widgets.ReferenceComboBox import Reference
+from Widgets.Types import Reference
 from Widgets.PipelineStepWidget import PipelineStepWidget
 from Widgets.PipelineInputWidget import PipelineInputWidget
 from Widgets.PipelineOutputWidget import PipelineOutputWidget
@@ -73,7 +73,7 @@ class PipelineListWidget(qt.QWidget):
         # overall input nodes
         pipeline = nx.DiGraph()
         for index, reference in enumerate(self._inputsWidget.stepOutputs):
-            pipeline.add_node((reference.step, None, reference.itemName), datatype=unannotatedType(reference.type), position=index)
+            pipeline.add_node((reference.step, None, reference.referenceName), datatype=unannotatedType(reference.type), position=index)
 
         # middle nodes
         for stepWidget in self._stepWidgets:
@@ -86,12 +86,12 @@ class PipelineListWidget(qt.QWidget):
                     if desc.currentReference is None:
                         raise ValueError("Cannot build a pipeline with an unset reference."
                                          f" See step {stepWidget.stepNumber} - {desc.name}")
-                    pipeline.add_edge((desc.currentReference.step, desc.currentReference.stepName, desc.currentReference.itemName),
+                    pipeline.add_edge((desc.currentReference.step, desc.currentReference.stepName, desc.currentReference.referenceName),
                                       (stepWidget.stepNumber, stepWidget.stepInfo.name, desc.name))
 
             # output side
             for reference in stepWidget.stepOutputs:
-                pipeline.add_node((reference.step, reference.stepName, reference.itemName), datatype=unannotatedType(reference.type))
+                pipeline.add_node((reference.step, reference.stepName, reference.referenceName), datatype=unannotatedType(reference.type))
 
         # overall output nodes
         for index, desc in enumerate(self._outputsWidget.inputs):
@@ -99,12 +99,12 @@ class PipelineListWidget(qt.QWidget):
                 raise ValueError("Cannot build a pipeline with an unset reference."
                                  f" See output {desc.name}")
             pipeline.add_node((self._outputsWidget.stepNumber, None, desc.name), datatype=unannotatedType(desc.currentReference.type), position=index)
-            pipeline.add_edge((desc.currentReference.step, desc.currentReference.stepName, desc.currentReference.itemName),
+            pipeline.add_edge((desc.currentReference.step, desc.currentReference.stepName, desc.currentReference.referenceName),
                               (self._outputsWidget.stepNumber, None, desc.name))
 
         return pipeline
 
-    def _computeStepOutputs(self) -> list[Reference]:
+    def _pipelineOutputs(self) -> list[Reference]:
         refs = self._inputsWidget.stepOutputs
         layout = self._stepsContainer.layout()
         for i in range(layout.count()):
@@ -121,7 +121,7 @@ class PipelineListWidget(qt.QWidget):
             stepWidget = layout.itemAt(stepNum - 1).widget()
             stepWidget.stepNumber = stepNum
 
-        newOutputs = self._computeStepOutputs()
+        newOutputs = self._pipelineOutputs()
 
         for stepNum in range(1, numRows + 1):
             stepWidget = layout.itemAt(stepNum - 1).widget()
@@ -138,7 +138,7 @@ class PipelineListWidget(qt.QWidget):
 
     def _onInsertPipelineStepAccepted(self, popUp) -> None:
         layout = self._stepsContainer.layout()
-        stepWidget = PipelineStepWidget("Temp - will be filled by _updateSteps", layout.count() + 1, popUp.selectedPipeline)
+        stepWidget = PipelineStepWidget("Temp - will be filled by _updateSteps", layout.count() + 1, info = popUp.selectedPipeline, inputsWidget = self._inputsWidget)
         layout.addWidget(stepWidget)
         stepWidget.requestedMoveUp.connect(lambda: self._moveStep(stepWidget, -1))
         stepWidget.requestedMoveDown.connect(lambda: self._moveStep(stepWidget, 1))
@@ -163,6 +163,9 @@ class PipelineListWidget(qt.QWidget):
 
     def _deleteStep(self, stepWidget) -> None:
         stepWidget.hide()
+        stepWidget.onRemoveStep()
         self._stepsContainer.layout().removeWidget(stepWidget)
         self._updateSteps()
         stepWidget.deleteLater()
+
+
