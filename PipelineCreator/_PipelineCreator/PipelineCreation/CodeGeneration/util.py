@@ -13,11 +13,20 @@ class CodePiece:
 
 
 def importCodeForType(type_: type) -> str:
-    return f"from {type_.__module__} import {type_.__name__}"
+    imports = []
+    allTypes = splitAnnotations(type_)
+    # Import Annotations
+    imports.append(("typing", "Annotated"))
+    # First item is an actual type
+    imports.append((allTypes[0].__module__, allTypes[0].__name__))
+    # All other types are instances e.g. Default(2)
+    for subType in allTypes[1]:
+        imports.append((subType.__class__.__module__, subType.__class__.__name__))
 
+    return "\n".join(["from {0} import {1}".format(module, type) for (module, type) in imports])
 
 def importCodeForTypes(nodes, pipeline: nx.DiGraph):
-    return "\n".join([importCodeForType(pipeline.nodes[n]['datatype']) for n in nodes])
+    return "\n".join([importCodeForType(pipeline.nodes[n]["datatype"]) for n in nodes])
 
 
 def cleanupImports(importsCode):

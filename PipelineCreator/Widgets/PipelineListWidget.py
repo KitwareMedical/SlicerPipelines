@@ -35,7 +35,7 @@ __all__ = ["PipelineListWidget"]
 class PipelineListWidget(qt.QWidget):
     """Defines the Interface for assembling a pipeline, consists of one PipelineInputWidget, one
     PipelineStepWidget per step and one PipelineOutputWidget. Each of these widgets has its own
-    implementation of a Parameter. The parameters are fixed for a step, but they are determined
+    implementation of a Parameter. The parameters names are fixed for a step, but they are determined
     by the user for the inputs and outputs.
     """
     def __init__(self, registrar: PipelineRegistrar, parent = None):
@@ -73,13 +73,17 @@ class PipelineListWidget(qt.QWidget):
         # overall input nodes
         pipeline = nx.DiGraph()
         for index, reference in enumerate(self._inputsWidget.stepOutputs):
-            pipeline.add_node((reference.step, None, reference.referenceName), datatype=unannotatedType(reference.type), position=index)
+            if reference.type != type(None):
+                pipeline.add_node((reference.step, None, reference.referenceName),
+                                datatype=reference.type,
+                                position=index)
 
         # middle nodes
         for stepWidget in self._stepWidgets:
             # input side
             for desc in stepWidget.inputs:
-                pipeline.add_node((stepWidget.stepNumber, stepWidget.stepInfo.name, desc.name), datatype=unannotatedType(desc.type))
+                pipeline.add_node((stepWidget.stepNumber, stepWidget.stepInfo.name, desc.name),
+                                  datatype=desc.type)
                 if desc.fixed:
                     pipeline.nodes[(stepWidget.stepNumber, stepWidget.stepInfo.name, desc.name)]["fixed_value"] = desc.computeFixedValue()
                 else:
@@ -91,14 +95,17 @@ class PipelineListWidget(qt.QWidget):
 
             # output side
             for reference in stepWidget.stepOutputs:
-                pipeline.add_node((reference.step, reference.stepName, reference.referenceName), datatype=unannotatedType(reference.type))
+                pipeline.add_node((reference.step, reference.stepName, reference.referenceName),
+                                  datatype=reference.type)
 
         # overall output nodes
         for index, desc in enumerate(self._outputsWidget.inputs):
             if desc.currentReference is None:
                 raise ValueError("Cannot build a pipeline with an unset reference."
                                  f" See output {desc.name}")
-            pipeline.add_node((self._outputsWidget.stepNumber, None, desc.name), datatype=unannotatedType(desc.currentReference.type), position=index)
+            pipeline.add_node((self._outputsWidget.stepNumber, None, desc.name),
+                              datatype=desc.currentReference.type,
+                              position=index)
             pipeline.add_edge((desc.currentReference.step, desc.currentReference.stepName, desc.currentReference.referenceName),
                               (self._outputsWidget.stepNumber, None, desc.name))
 

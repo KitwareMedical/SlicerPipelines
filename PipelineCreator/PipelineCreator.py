@@ -47,20 +47,16 @@ class PipelineCreator(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        # TODO: make this more human readable by adding spaces
         self.parent.title = "Pipeline Creator"
         self.parent.categories = ["Pipelines"]
         self.parent.dependencies = []
-        self.parent.contributors = ["Connor Bowley (Kitware, Inc.)"]
-        # TODO: update with short description of the module and a link to online module documentation
+        self.parent.contributors = ["Connor Bowley (Kitware, Inc.), Harald Scheirich (Kitware, Inc.)"]
         self.parent.helpText = """
 This is an example of scripted loadable module bundled in an extension.
 See more information in <a href="https://github.com/organization/projectname#PipelineCreator">module documentation</a>.
 """
-        # TODO: replace with organization, grant and thanks
         self.parent.acknowledgementText = """
-This file was originally developed by Jean-Christophe Fillion-Robin, Kitware Inc., Andras Lasso, PerkLab,
-and Steve Pieper, Isomics, Inc. and was partially funded by NIH grant 3P41RR013218-12S1.
+This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT.
 """
 
 
@@ -138,7 +134,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.StepsContainerWidget.setLayout(qt.QVBoxLayout())
         self.ui.PipelineListWidget = PipelineListWidget(self.logic.registrar)
         self.ui.StepsContainerWidget.layout().addWidget(self.ui.PipelineListWidget)
-  
+
         # Add pipeline categories to the combo box, select "Pipeline Creator" as default
         # Note the combobox gui wrapper is set to expect fixed choices can't be used here atm
         categories = set(c for info in self.logic.registeredPipelines.values() for c in info.categories)
@@ -147,7 +143,7 @@ class PipelineCreatorWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.CategoryComboBox.addItems(categories)
         self.ui.CategoryComboBox.setCurrentText('Pipeline Creator')
         self.ui.CategoryComboBox.setEditable(True)
-        self.ui.CategoryComboBox.connect('currentTextChanged(QString)', self.onCategoryChanged) 
+        self.ui.CategoryComboBox.connect('currentTextChanged(QString)', self.onCategoryChanged)
 
 
         # Connections
