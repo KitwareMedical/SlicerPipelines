@@ -21,11 +21,8 @@ class PipelineParameter:
 
 @dataclasses.dataclass
 class Reference:
-    """
-    A reference to an intermediate output.
-
-    Note: the overall inputs count as intermediate outputs because they can be used as
-    inputs to subsequent steps.
+    """Represents a source of values that may be used as input to a step or a final result.
+    This can be the result of a step or the overall inputs to the pipeline.
     """
     # Identifying pieces. Cannot change.
     owner: object

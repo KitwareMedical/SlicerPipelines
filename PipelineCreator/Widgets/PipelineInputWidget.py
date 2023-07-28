@@ -61,6 +61,7 @@ class PipelineInputParameterWidget(qt.QWidget):
             self.valueChanged.emit()
 
     def removeReferencing(self, pipelineParameter: PipelineParameter):
+        """Removes the reference _to_ the parameters given from this input"""
         if pipelineParameter in self._referencing:
             self._referencing.remove(pipelineParameter)
 
@@ -80,7 +81,7 @@ class PipelineInputParameterWidget(qt.QWidget):
                     text = text[:46] + " ..."
                 self.typeLabel.text = text
             else:
-                self.typeLabel.text = paramType.__class__.__name__
+                self.typeLabel.text = paramType.__name__
 
     @property
     def type(self) -> type:

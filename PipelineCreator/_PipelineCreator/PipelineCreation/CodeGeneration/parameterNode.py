@@ -11,6 +11,7 @@ from _PipelineCreator.PipelineCreation.CodeGeneration.util import (
     cleanupImports,
     importCodeForTypes,
     typeAsCode,
+    annotatedAsCode,
 )
 
 
@@ -27,7 +28,7 @@ from slicer.parameterNodeWrapper import parameterPack
 class {name}:'''.lstrip()
 
     for param in params:
-        code += f"\n{tab}{param[2]}: {typeAsCode(pipeline.nodes[param]['datatype'])}"
+        code += f"\n{tab}{param[2]}: {annotatedAsCode(pipeline.nodes[param]['datatype'])}"
 
     return CodePiece(imports=cleanupImports(imports), code=code)
 
@@ -42,7 +43,7 @@ def createParameterNode(name: str,
         inputsCode.imports,
         outputsCode.imports,
         "from slicer.parameterNodeWrapper import parameterNodeWrapper",
-    ]) + "\n" 
+    ]) + "\n"
 
         # code
     code = f'''
@@ -69,5 +70,5 @@ class {name}ParameterNode:
 {tab}inputs: {name}Inputs
 {tab}outputs: {name}Outputs
 '''.strip()
-    
+
     return CodePiece(imports, code)
