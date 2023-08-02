@@ -21,6 +21,7 @@ class SelectPipelinePopUp(qt.QDialog):
                 "SelectPipelinePopUp.ui")
         )
         self._mainLayout.addWidget(self._uiWidget)
+        self.setMinimumSize(300,300)
         self.ui = slicer.util.childWidgetVariables(self._uiWidget)
         self.ui.ButtonBox.accepted.connect(self.accept)
         self.ui.ButtonBox.rejected.connect(self.reject)

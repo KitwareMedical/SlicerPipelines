@@ -4,14 +4,19 @@ import sys
 import traceback
 from PipelineCaseIterator import PipelineCaseIteratorRunner
 
-_progressStatement = '<pipelineProgress>{overallPercent}, {currentPipelinePercent}, {totalCount}, {currentNumber}</pipelineProgress>'
+_progressStatement = '<pipelineProgress>{totalProgress}, {currentPipelinePieceName}, {currentPipelinePieceNumber}, {numberOfPieces}</pipelineProgress>'
 
-def _onProgress(progress):
-  print (_progressStatement.format(
-    overallPercent=progress.overallPercent,
-    currentPipelinePercent=progress.currentPipelinePercent,
-    totalCount=progress.totalCount,
-    currentNumber=progress.currentNumber,
+
+def _onProgress(totalProgress: float,
+                currentPipelinePieceName: str,
+                currentPipelinePieceNumber: int,
+                numberOfPieces: int):
+  """Note this is inner callback to a PipelineProgressObject callback"""
+  print(_progressStatement.format(
+    totalProgress=int(totalProgress * 100),
+    currentPipelinePieceName=currentPipelinePieceName,
+    currentPipelinePieceNumber=currentPipelinePieceNumber,
+    numberOfPieces=numberOfPieces,
   ))
 
 class _Namespace(object):
@@ -32,7 +37,6 @@ def main(args):
     args.pipelineName,
     args.inputFile,
     args.outputDirectory,
-    outputExtension=args.outputExtension,
     prefix=args.prefix,
     suffix=args.suffix,
     timestampFormat=args.timestampFormat)
@@ -48,7 +52,6 @@ if __name__ == "__main__":
   parser.add_argument('--pipelineName', required=True)
   parser.add_argument('--prefix', required=False, default=None)
   parser.add_argument('--suffix', required=False, default=None)
-  parser.add_argument('--outputExtension', required=False, default=None)
   parser.add_argument('--timestampFormat', required=False, default=None)
 
 

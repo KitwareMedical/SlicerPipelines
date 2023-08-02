@@ -1,6 +1,7 @@
 import networkx as nx
 
 from _PipelineCreator.PipelineRegistrar import PipelineInfo
+from slicer.parameterNodeWrapper import unannotatedType
 
 from .util import (
     fillInDataTypes,
@@ -24,7 +25,7 @@ def _validateFixedValuesMatchDataTypes(pipeline: nx.DiGraph) -> None:
     for node, attributes in pipeline.nodes(data=True):
         if "fixed_value" in attributes:
             fixed_value = attributes["fixed_value"]
-            datatype = attributes["datatype"]
+            datatype = unannotatedType(attributes["datatype"])
             if datatype == float and isinstance(fixed_value, int):
                 pass  # all implicit conversion from int to float
             elif not isinstance(fixed_value, datatype):
@@ -94,8 +95,8 @@ def _validateEachNonFixedInputHasConnection(pipeline: nx.DiGraph) -> None:
 
 def _validateConnectionDataTypes(pipeline: nx.DiGraph) -> None:
     for fromKey, toKey in pipeline.edges:
-        fromType = pipeline.nodes[fromKey]["datatype"]
-        toType = pipeline.nodes[toKey]["datatype"]
+        fromType = unannotatedType(pipeline.nodes[fromKey]["datatype"])
+        toType = unannotatedType(pipeline.nodes[toKey]["datatype"])
 
         if fromType == int and toType == float:
             pass # allow going from int to float

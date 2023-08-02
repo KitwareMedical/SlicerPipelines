@@ -3,8 +3,8 @@ import pickle
 import typing
 
 import networkx as nx
-
 from slicer import vtkMRMLNode
+from slicer.parameterNodeWrapper import splitAnnotations
 
 @dataclasses.dataclass
 class CodePiece:
@@ -13,11 +13,20 @@ class CodePiece:
 
 
 def importCodeForType(type_: type) -> str:
-    return f"from {type_.__module__} import {type_.__name__}"
+    imports = []
+    allTypes = splitAnnotations(type_)
+    # Import Annotations
+    imports.append(("typing", "Annotated"))
+    # First item is an actual type
+    imports.append((allTypes[0].__module__, allTypes[0].__name__))
+    # All other types are instances e.g. Default(2)
+    for subType in allTypes[1]:
+        imports.append((subType.__class__.__module__, subType.__class__.__name__))
 
+    return "\n".join(["from {0} import {1}".format(module, type) for (module, type) in imports])
 
 def importCodeForTypes(nodes, pipeline: nx.DiGraph):
-    return "\n".join([importCodeForType(pipeline.nodes[n]['datatype']) for n in nodes])
+    return "\n".join([importCodeForType(pipeline.nodes[n]["datatype"]) for n in nodes])
 
 
 def cleanupImports(importsCode):
@@ -61,9 +70,23 @@ def typeAsCode(type_: type) -> str:
     return f"pickle.loads({pickle.dumps(type_)})"
 
 
+def annotatedAsCode(annotations: typing.Annotated) -> str:
+    actualType, annotations = splitAnnotations(annotations)
+    if len(annotations) == 0:
+        return typeAsCode(actualType)
+
+    result = "Annotated["
+    result += typeAsCode(actualType) + ", "
+    for annotation in annotations:
+        result += annotation.__repr__() + ", "
+
+    result = result[:-2] + "]"  # remove last ", "
+    return result
+
+
 def valueAsCode(value) -> str:
     """
-    The only goal of this is to improve generated code readability 
+    The only goal of this is to improve generated code readability
     (and even that is mostly for testing)
     """
     type_ = type(value)

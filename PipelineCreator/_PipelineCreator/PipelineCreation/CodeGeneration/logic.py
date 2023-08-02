@@ -8,7 +8,7 @@ import networkx as nx
 import slicer
 from _PipelineCreator.PipelineCreation.CodeGeneration.util import (
     CodePiece, cleanupImports, importCodeForType, importCodeForTypes,
-    typeAsCode, valueAsCode)
+    typeAsCode, valueAsCode, annotatedAsCode)
 from _PipelineCreator.PipelineCreation.util import (getStep, groupNodesByStep,
                                                     splitParametersFromReturn)
 from _PipelineCreator.PipelineRegistrar import PipelineInfo
@@ -20,7 +20,7 @@ __all__ = ["createLogic"]
 def _getReturnType(lastStepNodes, fullPipeline, compositeReturnTypeClassName):
     assert len(lastStepNodes) != 0
     if len(lastStepNodes) == 1:
-        return fullPipeline.nodes[lastStepNodes[0]]['datatype']
+        return unannotatedType(fullPipeline.nodes[lastStepNodes[0]]["datatype"])
     else:
         return compositeReturnTypeClassName
 
@@ -28,7 +28,7 @@ def _getReturnType(lastStepNodes, fullPipeline, compositeReturnTypeClassName):
 def _makeToplevelFunctionSignature(functionName, fullPipeline, returnType: Union[str, type]) -> str:
     returnTypeCode = returnType if isinstance(returnType, str) else typeAsCode(returnType)
     params, _ = getStep(0, fullPipeline)
-    parameterString = ", ".join(f"{param[2]}: {typeAsCode(fullPipeline.nodes[param]['datatype'])}"
+    parameterString = ", ".join(f"{param[2]}: {annotatedAsCode(fullPipeline.nodes[param]['datatype'])}"
                                 for param in params)
     necessaryImports = "from PipelineCreator import PipelineProgressCallback\n" + importCodeForTypes(params, fullPipeline)
     if not isinstance(returnType, str):
@@ -92,7 +92,7 @@ def _getInput(node, pipeline: nx.DiGraph) -> str:
 
 def _generateStepCode(step, pipeline: nx.DiGraph, registeredPipelines: dict[str, PipelineInfo], numSteps, tab: str) -> str:
     """
-    Each output node is given a well known variable name by the 
+    Each output node is given a well known variable name by the
     """
     parameters, returns = splitParametersFromReturn(step)
     stepArguments = [
@@ -174,7 +174,7 @@ def _generateDeleteIntermediatesCode(pipeline: nx.DiGraph, tab: str):
                              if not '.' in name])
 
 
-    deletion = f"trueReturns = [{','.join(trueReturns)}]\n" 
+    deletion = f"trueReturns = [{','.join(trueReturns)}]\n"
     deletion += "\n".join(f"slicer.mrmlScene.RemoveNode({name})" for name in intermediateMRMLNodesNotInContainer)
     for i in intermediateMRMLNodesInContainer:
         container = i.split(".")[0]
@@ -207,6 +207,8 @@ def _generateRunFunction(pipeline: nx.DiGraph,
     # note: The extra pass is in case there are no pipeline steps.
     #       This can happen if the purpose of the pipeline is to filter down inputs.
     #       Not sure if this really ever useful, but it is easy to support.
+    # note: By reporting (0, numSteps, numSteps) we indicate that the pipeline is finished
+
     code = f"""def {functionSignature}:
 {tab}progress_callback.reportProgress("", 0, 0, {numSteps})
 {tab}# declare needed variables so they exist in the finally clause
@@ -218,7 +220,7 @@ def _generateRunFunction(pipeline: nx.DiGraph,
 {tab}finally:
 {tab}{tab}if delete_intermediate_nodes:
 {textwrap.indent(intermediateMRMLNodesDeletion, tab * 3)}
-
+{tab}# Report overall pipeline end
 {tab}progress_callback.reportProgress("", 0, {numSteps}, {numSteps})
 
 {tab}{returnStatement}"""
@@ -233,7 +235,7 @@ def _generateDecorator(
     """
         Generates the @slicerPipeline decorator.
         def slicerPipeline(name=None, dependencies=None, categories=None):
-        @slicerPipeline(name="Export Segmentation to LabelMap", categories=["Conversions", "Segmentation Operations"]) 
+        @slicerPipeline(name="Export Segmentation to LabelMap", categories=["Conversions", "Segmentation Operations"])
     """
     name = name.replace('"', '\\"')
     dependencies = dependencies or []
@@ -256,8 +258,8 @@ def createLogic(name: str,
     Returns a string which is the python code for the module logic.
     """
     logicName = f"{name}Logic"
-    pipelineDecorator = _generateDecorator(name=name, 
-                                           dependencies=dependencies, 
+    pipelineDecorator = _generateDecorator(name=name,
+                                           dependencies=dependencies,
                                            categories=categories)
     runFunctionCode, runFunctionImports = _generateRunFunction(pipeline, registeredPipelines, runFunctionName, parameterNodeOutputsName, tab)
 

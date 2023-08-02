@@ -19,8 +19,9 @@ from _PipelineCreator.PipelineRegistrar import PipelineInfo
 import vtk, qt, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
-from PipelineCreator import PipelineCreatorLogic
-from Library import *
+from PipelineCreator import PipelineCreatorLogic, PipelineProgressCallback
+from PipelineCaseIteratorLibrary import *
+
 
 # overall - int 0-100 with current overall progress
 # currentPipeline - int 0-100 with progress of currently running pipeline
@@ -30,13 +31,59 @@ PipelineCaseProgress = collections.namedtuple('PipelineCaseProgress',
                                               "overallPercent currentPipelinePercent totalCount currentNumber")
 
 
+def rowToTypes(csvRow: dict[str, str], inputTypes: dict[str, typing.Any]) -> \
+        (dict[str, typing.Any], list[slicer.vtkMRMLNode]):
+    """Converts a row from the csv file to the correct types for the pipeline,
+    and loads any nodes that are required.
+    Args:
+        csvRow (dict[str, str]): The row from the csv file
+        inputTypes (dict[str, typing.Any]): The types of the input parameters from the pipelineInfo
+    Returns:
+        data (dict[str, typing.Any]): The data converted to the ingoing types, None on conversion error
+        nodes (list[slicer.vtkMRMLNode]): The nodes that were created, None on conversion error
+    """
+    parameters = {}
+    nodes = []
+    valid = True
+    for name, paramType in inputTypes.items():
+        if name == "delete_intermediate_nodes":
+            continue
+        # Verify if
+        if issubclass(paramType, slicer.vtkMRMLNode):
+            inputNode = slicer.mrmlScene.AddNewNodeByClass(paramType.__name__)
+            nodes.append(inputNode)
+            with ScopedDefaultStorageNode(inputNode) as store:
+                store.SetFileName(csvRow[name])
+                success = store.ReadData(inputNode)
+                if success == 0:
+                    print(f"Could not load {csvRow[name]} as {paramType.__name__}")
+                    valid = False
+                    break
+            parameters[name] = inputNode
+        else:
+            try:
+                parameters[name] = paramType(csvRow[name])
+            except ValueError:
+                print(f"Could not cast {csvRow[name]} to {paramType.__name__}")
+                valid = False
+                break
+
+    if not valid:
+        for node in nodes:
+            slicer.mrmlScene.RemoveNode(node)
+        parameters = None
+        nodes = None
+
+    return parameters, nodes
+
+
 class PipelineCaseIteratorRunner(object):
     class _ProgressHelper(object):
         def __init__(self, numberOfFiles=0, currentFileIndex=0):
-            self.numberOfFiles = numberOfFiles
-            self.currentFileIndex = currentFileIndex
+            self.numberOfPasses = numberOfFiles
+            self.currentPassIndex = currentFileIndex
 
-    def __init__(self, pipelineName, inputFile, outputDirectory, outputExtension=None, prefix=None, suffix=None,
+    def __init__(self, pipelineName, inputFile, outputDirectory, prefix=None, suffix=None,
                  timestampFormat=None, pipelineCreatorLogic=None):
 
         if not os.path.isfile(inputFile):
@@ -50,31 +97,18 @@ class PipelineCaseIteratorRunner(object):
         self._pipeline = self._PipelineCreatorLogic.registeredPipelines[pipelineName]
         self._inputFile = inputFile
         self._outputDirectory = outputDirectory
-        self._progressCallback = None
+
+        # Note this is the inner callback to a PipelineProgressCallback object i.e
+        # progress == PipelineProgressCallback(self._progressCallback)
+        self._progressCallbackFunction = None
         self._prefix = prefix
         self._suffix = suffix
         self._timestampFormat = timestampFormat
         self._timestamp = None
-
-        #if outputExtension is None:
-        #    with ScopedNode(slicer.mrmlScene.AddNewNodeByClass(self._pipeline.returnType.__vtkname__)) as outputNode:
-        #        with ScopedDefaultStorageNode(outputNode) as store:
-        #            writeFileTypes = store.GetSupportedWriteFileTypes()
-        #            writeFileExts = vtk.vtkStringArray()
-        #            store.GetFileExtensionsFromFileTypes(writeFileTypes, writeFileExts)
-        #        if writeFileExts.GetNumberOfValues() > 0:
-        #            outputExtension = writeFileExts.GetValue(0)
-        #        else:
-        #            raise Exception('Output extension not specified and unable to deduce a valid extension')
-        #elif not outputExtension.startswith('.'):
-        #    outputExtension = '.' + outputExtension
-
-
-        #self._outputExtension = outputExtension
         self._progressHelper = self._ProgressHelper(0, 0)
 
     def setProgressCallback(self, progressCallback):
-        self._progressCallback = progressCallback
+        self._progressCallbackFunction = progressCallback
 
     def run(self):
         if self._timestampFormat is not None:
@@ -82,24 +116,26 @@ class PipelineCaseIteratorRunner(object):
 
         csvParameters = IteratorParameterFile(self._pipeline.parameters, inputFile=self._inputFile)
 
-        # self._pipeline.SetProgressCallback(self._setPipelineProgress)
-        rowCount = 0
-        outputData = []
+        callback = PipelineProgressCallback()
+        callback.setCallback(self._setPipelineProgress)
+        self._progressHelper.numberOfPasses = len(csvParameters)
 
-        for row in csvParameters:
+        outputData = []
+        inputNodes = []
+
+        for passIndex, row in enumerate(csvParameters):
             try:
-                inputParameters, inputNodes = self._rowToTypes(row, self._pipeline.parameters)
-                output = self._pipeline.function(**inputParameters)
-                outputRow = self._writeNodes(output, rowCount, self._outputDirectory)
+                self._progressHelper.currentPassIndex = passIndex
+                inputParameters, inputNodes = rowToTypes(row, self._pipeline.parameters)
+                output = self._pipeline.function(**inputParameters, progress_callback=callback)
+                outputRow = self._postProcessPipelineOutput(output, passIndex, self._outputDirectory)
                 outputData.append(outputRow | row)
             except Exception as e:
                 print(f"Exception: {e}")
                 traceback.print_exc()
             finally:
-                rowCount = rowCount + 1
                 for node in inputNodes:
                     slicer.mrmlScene.RemoveNode(node)
-            # self._pipeline.SetProgressCallback(None)
 
         self._writeResults(outputData, self._outputDirectory)
 
@@ -126,61 +162,27 @@ class PipelineCaseIteratorRunner(object):
         outputFilename += outputExtension
         return os.path.normpath(os.path.join(outputDirectory, outputFilename))
 
-    def _setPipelineProgress(self, pipelineProgress):
-        currentPipelineProgress = pipelineProgress.progress * 100
-        overallProgressBase = self._progressHelper.currentFileIndex / self._progressHelper.numberOfFiles * 100
-        if self._progressCallback is not None:
-            self._progressCallback(PipelineCaseProgress(
-                overallPercent=int(overallProgressBase + currentPipelineProgress / self._progressHelper.numberOfFiles),
-                currentPipelinePercent=int(currentPipelineProgress),
-                totalCount=self._progressHelper.numberOfFiles,
-                currentNumber=self._progressHelper.currentFileIndex,
-            ))
+    def _setPipelineProgress(self,
+                             totalSubProgress,
+                             currentPipelinePieceName,
+                             currentPipelineSubPieceNumber,
+                             numberOfSubPieces):
+        """Converts the progress of one pipeline into overall progress of the Case Iterator"""
+        currentPipelineProgress = totalSubProgress + currentPipelineSubPieceNumber / numberOfSubPieces
+        overallProgressBase = self._progressHelper.currentPassIndex / self._progressHelper.numberOfPasses
+        if self._progressCallbackFunction is not None:
+            totalProgress = overallProgressBase + currentPipelineProgress / self._progressHelper.numberOfPasses
+            self._progressCallbackFunction(
+                totalProgress,
+                currentPipelinePieceName,
+                self._progressHelper.currentPassIndex,
+                self._progressHelper.numberOfPasses,
+            )
 
-    def _rowToTypes(self, csvRow: dict[str, str], inputTypes: dict[str, typing.Any]):
-        """
-        Converts a row from the csv file to the correct types for the pipeline,
-        and loads any nodes that are required.
-        Args:
-            csvRow (dict[str, str]): The row from the csv file
-            inputTypes (dict[str, typing.Any]): The types of the input parameters from the pipelineInfo
-        """
-        parameters = {}
-        nodes = []
-        valid = True
-        for name, paramType in inputTypes.items():
-            if name == "delete_intermediate_nodes":
-                continue
-            # Verify if
-            if issubclass(paramType, slicer.vtkMRMLNode):
-                inputNode = slicer.mrmlScene.AddNewNodeByClass(paramType.__name__)
-                nodes.append(inputNode)
-                with ScopedDefaultStorageNode(inputNode) as store:
-                    store.SetFileName(csvRow[name])
-                    success = store.ReadData(inputNode)
-                    if success == 0:
-                        valid = False
-                        break
-                parameters[name] = inputNode
-            else:
-                try:
-                    parameters[name] = paramType(csvRow[name])
-                except ValueError:
-                    print(f"Could not cast {csvRow[name]} to {paramType.__name__}")
-                    valid = False
-                    break
-
-        if not valid:
-            for node in nodes:
-                slicer.mrmlScene.RemoveNode(node)
-            parameters = None
-            nodes = None
-
-        return parameters, nodes
-
-    def _writeNodes(self, output, rowCount: int, outputDirectory: str):
-        """ Write out all the nodes in a given output, the output is either a single value that
-        or a could be a node or a parameterPack that contains nodes
+    def _postProcessPipelineOutput(self, output, rowCount: int, outputDirectory: str) -> dict[str, str]:
+        """ Processes the output of a pipeline the output can either be a ParameterPack or
+        a single value. For each node in the output, write that node to a file. Returns a
+        dictionary with all the outputs file names if they are nodes, or their value otherwise
         """
         nodes = {}
         outputRow = {}
@@ -193,7 +195,6 @@ class PipelineCaseIteratorRunner(object):
                 else:
                     outputRow[param] = output.getValue(param)
         elif issubclass(output.__class__, slicer.vtkMRMLNode):
-            # TODO Should look up parameter name in Output type
             nodes["returnValue"] = output
 
         # Iterates over all nodes in the output, stores them to file
@@ -219,6 +220,7 @@ class PipelineCaseIteratorRunner(object):
 # PipelineCaseIterator
 #
 
+
 class PipelineCaseIterator(ScriptedLoadableModule):
     """Uses ScriptedLoadableModule base class, available at:
   https://github.com/Slicer/Slicer/blob/master/Base/Python/slicer/ScriptedLoadableModule.py
@@ -226,14 +228,22 @@ class PipelineCaseIterator(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = " Pipeline Case Iterator"
+        self.parent.title = "Pipeline Case Iterator"
         self.parent.categories = ["Pipelines"]
         self.parent.dependencies = ["PipelineCreator"]
-        self.parent.contributors = ["Connor Bowley (Kitware, Inc.)"]
+        self.parent.contributors = ["Connor Bowley (Kitware, Inc.)", "Harald Scheirich (Kitware, Inc.)", "David Allemang (Kitware, Inc.)"]
         self.parent.helpText = """
-This module allows running a pipeline over multiple files in a directory and output the results in another directory.
+<p>The case iterator lets you repeat the same pipeline operation over a any amount of data. To operate it follow the following steps:</p>
+<ol>
+<li>Select a pipeline that you want to execute</li>
+<li>Write a template input file. This will create a `.csv` file that has a column for each input parameter for the given pipeline. Each row in the input file will trigger one iteration of the pipeline with the given data. For each row every column has to be filled out. If the input data is a node, the entry should be a path to the data for that node</li>
+<li>Select a directory for the output. The output will consist in another `.csv` file that contains all the input and output data for that run, whenever a node is in the resulting data of a run the appropriate path will be in the output .csv file.</li>
+<li>Optionally choose whether you want to prepend, append fixed strings to the output data or add a timestamp. The timestamp will be the time of the beginning of the run, this means that all output date from one run will have the same timestamp.</li>
+<li>Press "Run", this will start executing the pipeline with the given data. When you press run a second copy of slicer will be started to do the actual calculation. if all or part of a given data for a pass it will be skipped and a message will show in the console. The progress of the run can be seen in the progress bar. You can always abort a run using the "Cancel" button.</li>
+</ol>
+<p>Note: When creating a template `.csv` file, each column name will show the name for the given parameter and its type</p>
 """
-        self.parent.acknowledgementText = "This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT."
+        self.parent.acknowledgementText = "This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT (R01EB021391)."
 
 
 #
@@ -275,7 +285,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
         # Create logic class. Logic implements all computations that should be possible to run
         # in batch mode, without a graphical user interface.
         self.logic = PipelineCaseIteratorLogic()
-        self.logic.setProgressCallback(self._progressCallback)
+        self.logic.setProgressCallback(self._updateProgressBars)
         self.logic.setFinishedCallback(self._runFinished)
 
         # Connections
@@ -295,12 +305,12 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
                                                               os.path.expanduser("~"))
         self._browseDirectory = self.ui.outputDirectoryLineEdit.text
         self.ui.pipelineNameLabel.text = settings.value('PipelineCaseIterator/LastPipelineName', '')
+        self._validateInputs()
 
-    def _progressCallback(self, progress: PipelineCaseProgress):
-        self.ui.overallProgressBar.value = progress.overallPercent
+    def _updateProgressBars(self, overallPercent, pipelineName, currentNumber, totalCount):
+        self.ui.overallProgressBar.value = overallPercent
         self.ui.overallProgressBar.setFormat(
-            '%p% (' + str(progress.currentNumber + 1) + '/' + str(progress.totalCount) + ')')
-        self.ui.pipelineProgressBar.value = progress.currentPipelinePercent
+            '%p% (' + str(currentNumber + 1) + '/' + str(totalCount) + ')')
 
     def browseInputFile(self):
         filePicker = qt.QFileDialog(self.parent, "Choose input file", self.ui.inputFileLineEdit.text)
@@ -308,9 +318,9 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
 
         if filePicker.exec():
             self.ui.inputFileLineEdit.text = filePicker.selectedFiles()[0]
-
+            self._validateInputs()
     def createTemplateFile(self):
-        filePicker = qt.QFileDialog(self.parent, "Choose input file", self.ui.inputFileLineEdit.text)
+        filePicker = qt.QFileDialog(self.parent, "Template file", self.ui.inputFileLineEdit.text)
         filePicker.setFileMode(qt.QFileDialog.AnyFile)
 
         if filePicker.exec():
@@ -320,7 +330,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
             parameters.createTemplate(self.ui.inputFileLineEdit.text)
 
     def browseOutputDirectory(self):
-        directoryPicker = qt.QFileDialog(self.parent, "Choose input directory", self._browseDirectory)
+        directoryPicker = qt.QFileDialog(self.parent, "Choose output directory", self._browseDirectory)
         directoryPicker.setFileMode(qt.QFileDialog.Directory)
         directoryPicker.setOption(qt.QFileDialog.ShowDirsOnly, True)
 
@@ -338,6 +348,28 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
         self.ui.pipelineNameLabel.text = popUp.selectedPipeline.name
         popUp.close()
         popUp.destroy()
+        self._validateInputs()
+
+    def _validateInputs(self):
+        if self.ui.pipelineNameLabel.text == "" or self.ui.inputFileLineEdit.text == "":
+            self.ui.runButton.enabled = False
+
+        pipelineName = self.ui.pipelineNameLabel.text
+        inputFilename = self.ui.inputFileLineEdit.text
+
+        pipelines = PipelineCreatorLogic().registeredPipelines
+        pipeline = pipelines[pipelineName]
+        file = IteratorParameterFile(pipeline.parameters)
+        if file.validate(inputFilename):
+            self.ui.runButton.enabled = True
+        else:
+            self.ui.runButton.enabled = False
+            msgbox = qt.QMessageBox()
+            msgbox.setWindowTitle('Error in parameter file')
+            msgbox.setText('The given file cannot be run with the pipeline that you chose ' +
+                           'not all of the parameters of the pipeline are satisfied')
+            msgbox.exec()
+            return
 
     def cancel(self):
         self.logic.cancel()
@@ -361,11 +393,9 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
     def run(self):
         self.ui.overallProgressBar.value = 0
         self.ui.overallProgressBar.setFormat('%p% (0/0)')
-        self.ui.pipelineProgressBar.value = 0
         inputFile = self.ui.inputFileLineEdit.text
         outputDirectory = self.ui.outputDirectoryLineEdit.text
         pipelineName = self.ui.pipelineNameLabel.text
-        outputExtension = self.ui.outputExtensionLineEdit.text if self.ui.outputExtensionLineEdit.text != '' else None
         prefix = self.ui.outputPrefixLineEdit.text  # empty string is acceptable
         suffix = self.ui.outputSuffixLineEdit.text  # empty string is acceptable
         timestampFormat = self.ui.timestampFormatLineEdit.text if self.ui.addTimestampCheckbox.checked else None
@@ -388,7 +418,6 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
                 pipelineInfo=pipelineInfo,
                 inputFile=inputFile,
                 outputDirectory=outputDirectory,
-                outputExtension=outputExtension,
                 prefix=prefix,
                 suffix=suffix,
                 timestampFormat=timestampFormat)
@@ -463,14 +492,13 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
     def run(self, pipelineInfo: PipelineInfo,
             inputFile: str,
             outputDirectory: str,
-            outputExtension: str = None,
             prefix: str = None,
             suffix: str = None,
             timestampFormat: str = None):
         # we cheat and know how the PipelineCaseIteratorRunner.py does its job, so we are going
         # to start it to short cut any exceptions and get better error messages
         # but we don't actually run anything in this process
-        PipelineCaseIteratorRunner(pipelineInfo.name, inputFile, outputDirectory, outputExtension, prefix, suffix,
+        PipelineCaseIteratorRunner(pipelineInfo.name, inputFile, outputDirectory, prefix, suffix,
                                    timestampFormat)
 
         script = self.resourcePath('CommandLineScripts/PipelineCaseIteratorRunner.py')
@@ -478,7 +506,7 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
             lambda: self._runImpl(
                 slicer.app.applicationFilePath(), script,
                 pipelineInfo.name, inputFile, outputDirectory,
-                outputExtension, prefix, suffix, timestampFormat),
+                prefix, suffix, timestampFormat),
             self._runFinished)
         self._asynchrony.Start()
         self._running = True
@@ -486,12 +514,13 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
     def runSynchronously(self, pipelineInfo: PipelineInfo,
                          inputFile: str,
                          outputDirectory: str,
-                         outputExtension: str = None,
                          prefix: str = None,
                          suffix: str = None,
                          timestampFormat: str = None):
+        """Executes the pipeline synchronously inside of slicer, allows for better testing
+        """
 
-        runner = PipelineCaseIteratorRunner(pipelineInfo.name, inputFile, outputDirectory, outputExtension, prefix,
+        runner = PipelineCaseIteratorRunner(pipelineInfo.name, inputFile, outputDirectory, prefix,
                                             suffix, timestampFormat)
         runner.run()
 
@@ -515,11 +544,12 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
         finally:
             self._asynchrony = None
 
-    def _runImpl(self, launcherPath, scriptPath, pipelineName, inputFile, outputDirectory, outputExtension, prefix,
+    def _runImpl(self, launcherPath, scriptPath, pipelineName, inputFile, outputDirectory, prefix,
                  suffix, timestampFormat):
         positiveIntReStr = '[0-9]+'
+        # TODO check the name regex against the pipeline naming conventions
         pipelineProgressRe = re.compile(
-            '<pipelineProgress>\s*(?P<overall>{integer}),\s*(?P<piece>{integer}),\s*(?P<totalCount>{integer}),\s*(?P<currentNumber>{integer})\s*</pipelineProgress>'.format(
+            '<pipelineProgress>\s*(?P<overall>{integer}),\s*(?P<pipelineName>[a-zA-Z0-9_.]*),\s*(?P<currentNumber>{integer}),\s*(?P<totalCount>{integer})\s*</pipelineProgress>'.format(
                 integer=positiveIntReStr))
 
         cmd = [
@@ -531,8 +561,6 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
             '--inputFile="%s"' % inputFile,
             '--outputDirectory="%s"' % outputDirectory,
         ]
-        if outputExtension:  # empty string would do nothing so don't send it
-            cmd += ['--outputExtension="%s"' % outputExtension]
         if prefix:  # empty string would do nothing so don't send it
             cmd += ['--prefix="%s"' % prefix]
         if suffix:  # empty string would do nothing so don't send it
@@ -554,11 +582,11 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
                     search = re.search(pipelineProgressRe, textOutput)
                     if search:
                         overallProgress = int(search.group('overall'))
-                        pieceProgress = int(search.group('piece'))
+                        pipelineName = search.group('pipelineName')
                         totalCount = int(search.group('totalCount'))
                         currentNumber = int(search.group('currentNumber'))
                         Asynchrony.RunOnMainThread(
-                            lambda: self._setProgress(overallProgress, pieceProgress, totalCount, currentNumber))
+                            lambda: self._setProgress(overallProgress, pipelineName, currentNumber, totalCount))
                     print(
                         textOutput.strip())  # prints the output as if it were run in this process. Useful for debugging.
             if proc.poll() == 0:
@@ -571,14 +599,14 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
         finally:
             proc.stdout.close()
 
-    def _setProgress(self, overall, piece, totalCount, currentNumber):
+    def _setProgress(self, overall, pipelineName : str, totalCount, currentNumber):
         if self._progressCallback is not None:
-            self._progressCallback(PipelineCaseProgress(
-                overallPercent=overall,
-                currentPipelinePercent=piece,
-                totalCount=totalCount,
-                currentNumber=currentNumber,
-            ))
+            self._progressCallback(
+                overall,
+                pipelineName,
+                totalCount,
+                currentNumber,
+            )
 
 
 #
@@ -600,8 +628,14 @@ class PipelineCaseIteratorTest(ScriptedLoadableModuleTest):
     def runTest(self):
         """Run as few or as many tests as needed here.
     """
-        self.setUp()
-        self.test_PipelineCaseIterator1()
+        import unittest
+        from Testing.Python.IteratorParametersTest import IteratorParametersTest
+        from Testing.Python.CaseIteratorRunnerTest import RowToTypesTest
+        loader = unittest.defaultTestLoader
+        suite = unittest.TestSuite()
+        suite.addTest(loader.loadTestsFromTestCase(IteratorParametersTest))
+        suite.addTest(loader.loadTestsFromTestCase(RowToTypesTest))
+        unittest.TextTestRunner().run(suite)
 
     def test_PipelineCaseIterator1(self):
         """ Ideally you should have several levels of tests.  At the lowest level

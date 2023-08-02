@@ -20,8 +20,12 @@ set(MODULE_PYTHON_SCRIPTS
   _${MODULE_NAME}/PipelineCreation/CodeGeneration/util.py
   _${MODULE_NAME}/PipelineCreation/CodeGeneration/widget.py
 
+  Widgets/PipelineInputWidget.py
   Widgets/PipelineListWidget.py
+  Widgets/PipelineOutputWidget.py
   Widgets/PipelineProgressBar.py
+  Widgets/PipelineStepWidget.py
+  Widgets/ReferenceComboBox.py
   Widgets/SelectPipelinePopUp.py
   )
 
