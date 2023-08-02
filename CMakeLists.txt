@@ -19,10 +19,6 @@ include(${Slicer_USE_FILE})
 
 #-----------------------------------------------------------------------------
 # Extension modules
-add_subdirectory(LegacyPipelineCreator)
-add_subdirectory(LegacyPipelineModules)
-add_subdirectory(LegacyPipelineCLIBridge)
-add_subdirectory(LegacyPipelineCaseIterator)
 add_subdirectory(PipelineCaseIterator)
 add_subdirectory(PipelineCreator)
 add_subdirectory(PipelineModules)
