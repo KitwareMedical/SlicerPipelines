@@ -228,10 +228,10 @@ class PipelineCaseIterator(ScriptedLoadableModule):
 
     def __init__(self, parent):
         ScriptedLoadableModule.__init__(self, parent)
-        self.parent.title = " Pipeline Case Iterator"
+        self.parent.title = "Pipeline Case Iterator"
         self.parent.categories = ["Pipelines"]
         self.parent.dependencies = ["PipelineCreator"]
-        self.parent.contributors = ["Connor Bowley (Kitware, Inc.), Harald Scheirich (Kitware, Inc.)"]
+        self.parent.contributors = ["Connor Bowley (Kitware, Inc.)", "Harald Scheirich (Kitware, Inc.)", "David Allemang (Kitware, Inc.)"]
         self.parent.helpText = """
 <p>The case iterator lets you repeat the same pipeline operation over a any amount of data. To operate it follow the following steps:</p>
 <ol>
@@ -243,7 +243,7 @@ class PipelineCaseIterator(ScriptedLoadableModule):
 </ol>
 <p>Note: When creating a template `.csv` file, each column name will show the name for the given parameter and its type</p>
 """
-        self.parent.acknowledgementText = "This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT."
+        self.parent.acknowledgementText = "This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT (R01EB021391)."
 
 
 #
