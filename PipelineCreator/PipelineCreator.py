@@ -50,13 +50,25 @@ class PipelineCreator(ScriptedLoadableModule):
         self.parent.title = "Pipeline Creator"
         self.parent.categories = ["Pipelines"]
         self.parent.dependencies = []
-        self.parent.contributors = ["Connor Bowley (Kitware, Inc.), Harald Scheirich (Kitware, Inc.)"]
+        self.parent.contributors = ["Connor Bowley (Kitware, Inc.)", "Harald Scheirich (Kitware, Inc.)", "David Allemang (Kitware, Inc.)"]
         self.parent.helpText = """
-This is an example of scripted loadable module bundled in an extension.
-See more information in <a href="https://github.com/organization/projectname#PipelineCreator">module documentation</a>.
+<p>Creating a pipeline using the Pipeline Creator module</p>
+<ol>
+<li>To add steps to your pipeline, press the <b>Add Step</b> button in the `Pipeline Creator`. This will show a window where you can select the item you want to add.</li>
+<li>Pick the item you want, it will be added as a step to your pipeline.</li>
+<li>For each parameter you decide wether you want its value to be fixed to a given value, refer to an output of a previous step, or be set by the user at runtime.
+You can add parameters to be set by the user by pressing the <b>+</b> button in `Step 0 - Inputs`.</li>
+<li>You need to repeat this process until the pipeline has all the steps in your workflow.</li>
+<li>Once all the steps have been appropriately captured in your pipeline interface, you can fill in the remaining fields like name and output directory.</li>
+<li>Press <b>Test Pipeline</b> to make sure the pipeline is valid.</li>
+<li>Press <b>Generate Pipeline</b> and the pipeline will be created.</li>
+</ol>
+
+<p>You should be able to find your new pipeline in the modules dropdown under a `Pipeline Modules` folder, as well as in the <b>Add Step</b> pop up of the Pipeline Creator, so you can use the new module as a piece in a future pipeline.</p>
 """
+
         self.parent.acknowledgementText = """
-This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT.
+This module was originally developed by Connor Bowley (Kitware, Inc.) for SlicerSALT (R01EB021391).
 """
 
 

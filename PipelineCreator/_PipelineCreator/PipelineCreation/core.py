@@ -30,7 +30,7 @@ def _createPythonFileCode(name: str,
         title=name,
         categories=["PipelineModules"],
         dependencies=dependencies,
-        contributors=["Connor Bowley (Kitware, Inc)", "PipelineCreator"],
+        contributors=["Connor Bowley (Kitware, Inc)", "Harald Scheirich (Kitware Inc)", "David Allemang (Kitware, Inc.)", "PipelineCreator"],
         helpText="This module was created by the PipelineCreator.",
         acknowledgementText="This module was created by the PipelineCreator.",
         tab=tab)
@@ -86,7 +86,7 @@ def _validatePipelineName(pipelineName: str) -> None:
 
         if errorStr:
             raise Exception(f"Error creating pipeline: \n{errorStr}")
-        
+
 def _gatherDependencies(pipeline: nx.DiGraph, registeredPipelines: dict[str, PipelineInfo]) -> list[str]:
     """
     Gathers all dependencies of the pipeline.
