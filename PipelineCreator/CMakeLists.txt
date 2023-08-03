@@ -27,6 +27,7 @@ set(MODULE_PYTHON_SCRIPTS
   Widgets/PipelineStepWidget.py
   Widgets/ReferenceComboBox.py
   Widgets/SelectPipelinePopUp.py
+  Widgets/Types.py
   )
 
 set(MODULE_PYTHON_RESOURCES
