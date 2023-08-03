@@ -18,6 +18,10 @@ The _Select_ button will bring up a a dialog to select the pipeline that you wan
 
 Once you have set the output directory you are ready to run the pipeline. The output directory will contain all the results of the pipeline, as well as a `.csv` file with the appropriate input and output parameters for each row.
 
+| ![Case Iterator](Images/iterator_new.png) |
+| :--: |
+| _Case Iterator_ |
+
 ### CSV File
 
 The input `.csv` file should contain a header row with the names of the parameters in the respective column. If you are unsure you can use the _Create Template Parameter File_ button to create a stub `.csv` file with the appropriate headers. The file created via the button will not only name the paramter for the column but will also include the type of the respective parameter in the form `<name>:<type>`. The type is informational and not required when you label your own `.csv` file.
@@ -34,4 +38,4 @@ Any resulting node data will be stored in the output directory, all resulting sc
 
 ## Optional Settings
 
-The _Output Prefix_, _Output Suffix_, and _Output Extension_ fields allow for the customization of the output files. The _Output Prefix_ and _Output Suffix_ will be added to the beginning and end of the output files respectively. With _Add Timestamp_ checkbox enabled the current date and time will be added to the output files.
+The _Output Prefix_, _Output Suffix_, and _Output Extension_ fields allow for the customization of the output files. The _Output Prefix_ and _Output Suffix_ will be added to the beginning and end of the output files respectively. With _Add Timestamp_ checkbox enabled the current date and time will be added to the output files. In the _Advanced_ section you can modify the format of the timestamp.
