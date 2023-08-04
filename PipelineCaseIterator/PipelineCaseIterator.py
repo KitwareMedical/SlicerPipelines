@@ -97,6 +97,7 @@ class PipelineCaseIteratorRunner(object):
         self._pipeline = self._PipelineCreatorLogic.registeredPipelines[pipelineName]
         self._inputFile = inputFile
         self._outputDirectory = outputDirectory
+        self._resultsFileName = resultsFileName if resultsFileName.endswith('.csv') else resultsFileName + '.csv'
 
         # Note this is the inner callback to a PipelineProgressCallback object i.e
         # progress == PipelineProgressCallback(self._progressCallback)
@@ -140,7 +141,7 @@ class PipelineCaseIteratorRunner(object):
         self._writeResults(outputData, self._outputDirectory)
 
     def _writeResults(self, data: list[dict[str, typing.Any]], outputDirectory: str):
-        filename = os.path.join(outputDirectory, "results.csv")
+        filename = os.path.join(outputDirectory, self._resultsFileName)
         if not data:
             return
         fieldnames = data[0].keys()
@@ -305,7 +306,9 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
                                                               os.path.expanduser("~"))
         self._browseDirectory = self.ui.outputDirectoryLineEdit.text
         self.ui.pipelineNameLabel.text = settings.value('PipelineCaseIterator/LastPipelineName', '')
-        self._validateInputs()
+        self.ui.resultsFileNameLineEdit.text = settings.value('PipelineCaseIterator/LastResultFileName', 'results')
+
+        self._validateInputs(doWarn=False)
 
     def _updateProgressBars(self, overallPercent, pipelineName, currentNumber, totalCount):
         self.ui.overallProgressBar.value = overallPercent
@@ -319,6 +322,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
         if filePicker.exec():
             self.ui.inputFileLineEdit.text = filePicker.selectedFiles()[0]
             self._validateInputs()
+
     def createTemplateFile(self):
         filePicker = qt.QFileDialog(self.parent, "Template file", self.ui.inputFileLineEdit.text)
         filePicker.setFileMode(qt.QFileDialog.AnyFile)
@@ -396,6 +400,10 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
         inputFile = self.ui.inputFileLineEdit.text
         outputDirectory = self.ui.outputDirectoryLineEdit.text
         pipelineName = self.ui.pipelineNameLabel.text
+        resultsFileName = self.ui.resultsFileNameLineEdit.text
+        if resultsFileName == '':
+            resultsFileName = 'results.csv'
+
         prefix = self.ui.outputPrefixLineEdit.text  # empty string is acceptable
         suffix = self.ui.outputSuffixLineEdit.text  # empty string is acceptable
         timestampFormat = self.ui.timestampFormatLineEdit.text if self.ui.addTimestampCheckbox.checked else None
@@ -418,6 +426,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
                 pipelineInfo=pipelineInfo,
                 inputFile=inputFile,
                 outputDirectory=outputDirectory,
+                resultsFileName=resultsFileName,
                 prefix=prefix,
                 suffix=suffix,
                 timestampFormat=timestampFormat)
@@ -492,20 +501,21 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
     def run(self, pipelineInfo: PipelineInfo,
             inputFile: str,
             outputDirectory: str,
+            resultsFileName: str = 'results.csv',
             prefix: str = None,
             suffix: str = None,
             timestampFormat: str = None):
         # we cheat and know how the PipelineCaseIteratorRunner.py does its job, so we are going
         # to start it to short cut any exceptions and get better error messages
         # but we don't actually run anything in this process
-        PipelineCaseIteratorRunner(pipelineInfo.name, inputFile, outputDirectory, prefix, suffix,
+        PipelineCaseIteratorRunner(pipelineInfo.name, inputFile, outputDirectory, resultsFileName, prefix, suffix,
                                    timestampFormat)
 
         script = self.resourcePath('CommandLineScripts/PipelineCaseIteratorRunner.py')
         self._asynchrony = Asynchrony(
             lambda: self._runImpl(
                 slicer.app.applicationFilePath(), script,
-                pipelineInfo.name, inputFile, outputDirectory,
+                pipelineInfo.name, inputFile, outputDirectory, resultsFileName,
                 prefix, suffix, timestampFormat),
             self._runFinished)
         self._asynchrony.Start()
@@ -514,13 +524,14 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
     def runSynchronously(self, pipelineInfo: PipelineInfo,
                          inputFile: str,
                          outputDirectory: str,
+                         resultsFileName: str = None,
                          prefix: str = None,
                          suffix: str = None,
                          timestampFormat: str = None):
         """Executes the pipeline synchronously inside of slicer, allows for better testing
         """
 
-        runner = PipelineCaseIteratorRunner(pipelineInfo.name, inputFile, outputDirectory, prefix,
+        runner = PipelineCaseIteratorRunner(pipelineInfo.name, inputFile, outputDirectory, resultsFileName, prefix,
                                             suffix, timestampFormat)
         runner.run()
 
@@ -544,8 +555,8 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
         finally:
             self._asynchrony = None
 
-    def _runImpl(self, launcherPath, scriptPath, pipelineName, inputFile, outputDirectory, prefix,
-                 suffix, timestampFormat):
+    def _runImpl(self, launcherPath, scriptPath, pipelineName, inputFile, outputDirectory, resultsFileName,
+                 prefix, suffix, timestampFormat):
         positiveIntReStr = '[0-9]+'
         # TODO check the name regex against the pipeline naming conventions
         pipelineProgressRe = re.compile(
@@ -560,6 +571,7 @@ class PipelineCaseIteratorLogic(ScriptedLoadableModuleLogic):
             '--pipelineName="%s"' % pipelineName,
             '--inputFile="%s"' % inputFile,
             '--outputDirectory="%s"' % outputDirectory,
+            '--resultsFileName="%s"' % resultsFileName,
         ]
         if prefix:  # empty string would do nothing so don't send it
             cmd += ['--prefix="%s"' % prefix]
