@@ -13,17 +13,10 @@
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <layout class="QGridLayout" name="gridLayout">
-     <item row="3" column="2">
-      <widget class="QPushButton" name="inputFileBrowseButton">
+     <item row="2" column="0">
+      <widget class="QLabel" name="label_2">
        <property name="text">
-        <string>Browse</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="2">
-      <widget class="QPushButton" name="pipelineSelectionButton">
-       <property name="text">
-        <string>Select</string>
+        <string>Pipeline</string>
        </property>
       </widget>
      </item>
@@ -34,20 +27,6 @@
        </property>
       </widget>
      </item>
-     <item row="5" column="0">
-      <widget class="QLabel" name="label_3">
-       <property name="text">
-        <string>Output Directory</string>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="0">
-      <widget class="QLabel" name="label_2">
-       <property name="text">
-        <string>Pipeline</string>
-       </property>
-      </widget>
-     </item>
      <item row="3" column="0">
       <widget class="QLabel" name="label_11">
        <property name="text">
@@ -55,8 +34,36 @@
        </property>
       </widget>
      </item>
+     <item row="4" column="1">
+      <widget class="QPushButton" name="createTemplateFileButton">
+       <property name="text">
+        <string>Create Template Parameter File</string>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="2">
+      <widget class="QPushButton" name="pipelineSelectionButton">
+       <property name="text">
+        <string>Select</string>
+       </property>
+      </widget>
+     </item>
      <item row="3" column="1">
       <widget class="QLineEdit" name="inputFileLineEdit"/>
+     </item>
+     <item row="5" column="0">
+      <widget class="QLabel" name="label_3">
+       <property name="text">
+        <string>Output Directory</string>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="2">
+      <widget class="QPushButton" name="inputFileBrowseButton">
+       <property name="text">
+        <string>Browse</string>
+       </property>
+      </widget>
      </item>
      <item row="5" column="1">
       <widget class="QLineEdit" name="outputDirectoryLineEdit"/>
@@ -74,10 +81,13 @@
        </property>
       </widget>
      </item>
-     <item row="4" column="1">
-      <widget class="QPushButton" name="createTemplateFileButton">
+     <item row="6" column="1">
+      <widget class="QLineEdit" name="resultsFileNameLineEdit"/>
+     </item>
+     <item row="6" column="0">
+      <widget class="QLabel" name="label">
        <property name="text">
-        <string>Create Template Parameter File</string>
+        <string>Results file</string>
        </property>
       </widget>
      </item>

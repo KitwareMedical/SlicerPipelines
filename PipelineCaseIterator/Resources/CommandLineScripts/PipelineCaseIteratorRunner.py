@@ -37,6 +37,7 @@ def main(args):
     args.pipelineName,
     args.inputFile,
     args.outputDirectory,
+    resultsFileName=args.resultsFileName,
     prefix=args.prefix,
     suffix=args.suffix,
     timestampFormat=args.timestampFormat)
@@ -53,6 +54,7 @@ if __name__ == "__main__":
   parser.add_argument('--prefix', required=False, default=None)
   parser.add_argument('--suffix', required=False, default=None)
   parser.add_argument('--timestampFormat', required=False, default=None)
+  parser.add_argument('--resultsFileName', required=False, default='results.csv')
 
 
   try:
