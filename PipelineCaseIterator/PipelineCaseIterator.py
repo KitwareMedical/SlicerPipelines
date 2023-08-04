@@ -349,12 +349,15 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
         pass
 
     def _onPopUpAccepted(self, popUp: SelectPipelinePopUp):
-        self.ui.pipelineNameLabel.text = popUp.selectedPipeline.name
+        oldPipe = self.ui.pipelineNameLabel.text
+        newPipe = popUp.selectedPipeline.name
         popUp.close()
         popUp.destroy()
-        self._validateInputs()
+        if oldPipe != newPipe:
+            self.ui.pipelineNameLabel.text = newPipe
+            self._validateInputs(False)
 
-    def _validateInputs(self):
+    def _validateInputs(self, doWarn = True) -> bool:
         if self.ui.pipelineNameLabel.text == "" or self.ui.inputFileLineEdit.text == "":
             self.ui.runButton.enabled = False
 
@@ -364,16 +367,21 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
         pipelines = PipelineCreatorLogic().registeredPipelines
         pipeline = pipelines[pipelineName]
         file = IteratorParameterFile(pipeline.parameters)
-        if file.validate(inputFilename):
-            self.ui.runButton.enabled = True
-        else:
-            self.ui.runButton.enabled = False
-            msgbox = qt.QMessageBox()
-            msgbox.setWindowTitle('Error in parameter file')
-            msgbox.setText('The given file cannot be run with the pipeline that you chose ' +
-                           'not all of the parameters of the pipeline are satisfied')
-            msgbox.exec()
-            return
+        isValid = file.validate(inputFilename)
+
+        if not isValid:
+            self.ui.inputFileLineEdit.text = ""
+            if doWarn:
+                msgbox = qt.QMessageBox()
+                msgbox.setWindowTitle('Error in parameter file')
+                msgbox.setText('The given file cannot be run with the pipeline that you chose ' +
+                            'not all of the parameters of the pipeline are satisfied, please ' +
+                            'chose another file or edit the one you selected.')
+                msgbox.exec()
+
+        self.ui.runButton.enabled = isValid
+
+        return isValid
 
     def cancel(self):
         self.logic.cancel()
