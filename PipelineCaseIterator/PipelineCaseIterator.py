@@ -31,7 +31,7 @@ PipelineCaseProgress = collections.namedtuple('PipelineCaseProgress',
                                               "overallPercent currentPipelinePercent totalCount currentNumber")
 
 
-def rowToTypes(csvRow: dict[str, str], inputTypes: dict[str, typing.Any]) -> \
+def rowToTypes(csvRow: dict[str, str], inputTypes: dict[str, typing.Any], baseDirectory : str = "") -> \
         (dict[str, typing.Any], list[slicer.vtkMRMLNode]):
     """Converts a row from the csv file to the correct types for the pipeline,
     and loads any nodes that are required.
@@ -45,6 +45,10 @@ def rowToTypes(csvRow: dict[str, str], inputTypes: dict[str, typing.Any]) -> \
     parameters = {}
     nodes = []
     valid = True
+
+    if baseDirectory == '':
+        baseDirectory = os.curdir()
+
     for name, paramType in inputTypes.items():
         if name == "delete_intermediate_nodes":
             continue
@@ -53,10 +57,20 @@ def rowToTypes(csvRow: dict[str, str], inputTypes: dict[str, typing.Any]) -> \
             inputNode = slicer.mrmlScene.AddNewNodeByClass(paramType.__name__)
             nodes.append(inputNode)
             with ScopedDefaultStorageNode(inputNode) as store:
-                store.SetFileName(csvRow[name])
+                # Handle relative filenames
+                filePath = csvRow[name]
+                if not os.path.isabs(filePath):
+                    filePath = os.path.join(baseDirectory, filePath)
+
+                if not os.path.exists(filePath):
+                    print(f"Could not load {filePath}, it doesn't exist")
+                    valid = False
+                    break
+
+                store.SetFileName(filePath)
                 success = store.ReadData(inputNode)
                 if success == 0:
-                    print(f"Could not load {csvRow[name]} as {paramType.__name__}")
+                    print(f"Could not load {filePath} as {paramType.__name__}")
                     valid = False
                     break
             parameters[name] = inputNode
@@ -72,9 +86,9 @@ def rowToTypes(csvRow: dict[str, str], inputTypes: dict[str, typing.Any]) -> \
         for node in nodes:
             slicer.mrmlScene.RemoveNode(node)
         parameters = None
-        nodes = None
+        nodes = []
 
-    return parameters, nodes
+    return valid, parameters, nodes
 
 
 class PipelineCaseIteratorRunner(object):
@@ -83,11 +97,14 @@ class PipelineCaseIteratorRunner(object):
             self.numberOfPasses = numberOfFiles
             self.currentPassIndex = currentFileIndex
 
-    def __init__(self, pipelineName, inputFile, outputDirectory, prefix=None, suffix=None,
+    def __init__(self, pipelineName, inputFile, outputDirectory, resultsFileName = "results.csv", prefix=None, suffix=None,
                  timestampFormat=None, pipelineCreatorLogic=None):
 
         if not os.path.isfile(inputFile):
             raise RuntimeError("Input directory does not exist or is not a directory: " + inputFile)
+
+        # Directory is used to allow relative pathnames in the input file
+        self._baseDir = os.path.dirname(os.path.abspath(inputFile))
 
         if not os.path.exists(outputDirectory):
             os.makedirs(outputDirectory)
@@ -127,10 +144,13 @@ class PipelineCaseIteratorRunner(object):
         for passIndex, row in enumerate(csvParameters):
             try:
                 self._progressHelper.currentPassIndex = passIndex
-                inputParameters, inputNodes = rowToTypes(row, self._pipeline.parameters)
-                output = self._pipeline.function(**inputParameters, progress_callback=callback)
-                outputRow = self._postProcessPipelineOutput(output, passIndex, self._outputDirectory)
-                outputData.append(outputRow | row)
+                valid, inputParameters, inputNodes = rowToTypes(row, self._pipeline.parameters, baseDirectory=self._baseDir)
+                if valid:
+                    output = self._pipeline.function(**inputParameters, progress_callback=callback)
+                    outputRow = self._postProcessPipelineOutput(output, passIndex, self._outputDirectory)
+                    outputData.append(outputRow | row)
+                else:
+                    print(f"Invalid data in row {passIndex}, skipping ...")
             except Exception as e:
                 print(f"Exception: {e}")
                 traceback.print_exc()
@@ -360,6 +380,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
     def _validateInputs(self, doWarn = True) -> bool:
         if self.ui.pipelineNameLabel.text == "" or self.ui.inputFileLineEdit.text == "":
             self.ui.runButton.enabled = False
+            return False
 
         pipelineName = self.ui.pipelineNameLabel.text
         inputFilename = self.ui.inputFileLineEdit.text
@@ -456,6 +477,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
         settings.setValue('PipelineCaseIterator/LastInputFile', self.ui.inputFileLineEdit.text)
         settings.setValue('PipelineCaseIterator/LastOutputDirectory', self.ui.outputDirectoryLineEdit.text)
         settings.setValue('PipelineCaseIterator/LastPipelineName', self.ui.pipelineNameLabel.text)
+        settings.setValue('PipelineCaseIterator/LastResultsFileName', self.ui.resultsFileNameLabel.text)
 
 
 class CaseIteratorSubProcessError(Exception):
