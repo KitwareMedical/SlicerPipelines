@@ -6,18 +6,16 @@ In this document we will use the following terms to refer to the different compo
 
 - *Pipeline*: Any piece of code that is marked up with the `@slicerPipeline` decorator. This can be standalone pieces of code or part of a Pipeline Module. As these are just regular functions we will also talk about their input parameters or inputs, and their return values or outputs.
 - *Pipeline Module*: A slicer module that also presents it's functionality as a pipeline, the product of Pipeline Creator are Pipeline Modules
-- *Pipeline Step*: or just step is a pipeline used as inside of Pipeline Creator.
+- *Pipeline Step*: or just step is a pipeline used as a part inside of Pipeline Creator.
 
 ## Quick Start
 
 1. To add steps to your pipeline, press the **Add Step** button in the `Pipeline Creator`. This will show a window where you can select the item you want to add.
 2. **Pick the item** you want, it will be added as a step to your pipeline.
-3. For each parameter you decide wether you want its value to be fixed
-
- to a given value, refer to an output of a previous step, or be set by the user at runtime. You can add parameters to be set by the user by pressing the **+** button in `Step 0 - Inputs`.
+3. For each parameter you decide wether you want its value to be fixed to a given value, refer to an output of a previous step, or be set by the user at runtime. You can add parameters to be set by the user by pressing the **+** button in the area `Step 0 - Inputs`.
 3. You need to **repeat** this process until the pipeline has all the steps in your workflow.
 4. Once all the steps have been appropriately captured in your pipeline interface, you can **fill in the remaining fields** like name and output directory.
-5. Press **Test Pipeline** to make sure the pipeline is valid.
+5. Press **Test Pipeline** to make sure the pipeline is valid. A pipeline may be invalid if there are unconnected parameters that are not fixed.
 6. Press **Generate Pipeline** and the pipeline will be created.
 
 ## The Pipeline Creator module
@@ -33,9 +31,9 @@ The top section of the Pipeline Creator lets you set up some basic values for yo
 - _Category_: The category that this pipeline belongs to. This is used to organize the pipelines in the Pipeline Creator.
 - _Output Directory_: The location where the pipeline module will be created.
 
-- _Load module on creation_: If checked a newly generated module will be loaded into Slicer. This is useful if you want to test the pipeline right away.
+- _Load module on creation_: If checked the newly generated module will be loaded into Slicer immediately. This is useful if you want to use the pipeline right away.
 
-- _Add to additional module paths_: If checked the output directory will be added to the additional module paths. This means the module will be loaded every time slicer starts
+- _Add to additional module paths_: If checked the output directory will be added to the slicer module paths. This means the module will be loaded every time slicer starts
 
 | ![Pipeline Creator Top Section](Images/creator_top.png) |
 | :--: |
@@ -43,13 +41,13 @@ The top section of the Pipeline Creator lets you set up some basic values for yo
 
 ### Input and Output steps
 
-- Step 0 Inputs: This is where the _overall_ inputs to your newly created pipeline will be defined. These inputs will be available to all the steps in your pipeline. The inputs may go to any of the steps. After the pipeline module has been generated all of the inputs will be available for you to set when you run the pipeline.
+- Step 0 Inputs: This is where you define the _overall_ inputs to your newly created pipeline. These inputs will be available to all the steps in your pipeline. The inputs may go to any of the steps and can be reused in multiple steps. After the pipeline module has been generated all of these inputs will be available for you to set in the UI when you run the pipeline.
 
 | ![Pipeline Creator Input Section](Images/creator_empty_inputs.png) |
 | :--: |
 | _Pipeline Creator Inputs_ |
 
-- Step 1 Outputs: This is where you will define the _overall_ outputs of your newly created pipeline. The outputs may come from any of the steps. This step will be renumbered as you add more steps to your pipeline.
+- Step 1 Outputs: This is where you will define the _overall_ outputs of your newly created pipeline. The outputs may come from any of the steps. This step will be renumbered as you add more steps to your pipeline. Output parameters need to be connected to other parameters for the pipeline to be valid.
 
 | ![Pipeline Creator Output Section](Images/creator_empty_outputs.png) |
 | :--: |
@@ -59,13 +57,13 @@ In both the Input and Output steps you can add new parameters by pressing the "+
 
 ### Pipeline steps
 
-- Add Step: This button will open a popup window where you can select the step you want to add to your pipeline. The steps are organized in categories. Each additional step will be places _after_ the last step and before the Outputs step. You can reorder the steps by using the up and down arrows. You can delete a step by clicking on the trash icon.
+- Add Step: This button will open a popup window where you can select the kind of pipeline you want to add. The pipelines are organized in categories and can be filtered by category. Each additional step will be placed _after_ the last step and before the outputs step. You can reorder the steps by using the up and down arrows. You can delete a step by clicking on the trash icon.
 
 | ![Add Step Dialog](Images/creator_add_step.png) |
 | :--: |
 | _Pipeline Creator Add Step_ |
 
-The interface for a step will show which input parameters (Inputs) this step takes, and what the return value of the step is. The return value (Outputs) will be available as an input to the other steps in the pipeline. The user interface for the step is automatically generated by inspecting the function signature of the step.
+The interface for a step will show which input parameters (inputs) this step takes, and what the return value of the step is. The return value (outputs) will be available as an input to the other steps in the pipeline. The user interface for the step is automatically generated by inspecting the function signature of the step.
 
 
 | ![Newly Added Step](Images/creator_new_step.png) |
@@ -73,17 +71,20 @@ The interface for a step will show which input parameters (Inputs) this step tak
 | _Newly created Scale Mesh Step_ |
 
 
-The value of parameter inside a step can either be _fixed_ or a _reference_ to another parameter. By default all parameters except for those that are slicer nodes are fixed and you can edit the value directly in the Pipeline Creator. If you want to reference another parameter you can uncheck the _Fixed_ checkbox.  After that you can select the parameter you want to reference in the combo box. When running the value of the parameter will be the value of the referenced parameter.
+The value of parameter inside a step can either be _fixed_ or a _reference_ to another parameter. By default all parameters except for those that are slicer nodes are fixed and you can edit the value directly in the Pipeline Creator. If you want to reference another parameter you can uncheck the _Fixed_ checkbox. After that you can select the parameter you want to reference in the combo box. When running the value of the parameter will be the value of the referenced parameter.
 
-You will only be able to connect parameters to other parameters whose type matches. For example you can only connect a `vtkMRMLScalarVolumeNode` to a `vtkMRMLScalarVolumeNode` or a `float` to a `float`. You can also only connect parameters that are _upstream_ of the parameter you are connecting to. For example you can connect a parameter in step 2 to a parameter in step 1, but not the other way around. The popup window will only show you the parameters that are available to connect to.
+You will only be able to connect parameters to other parameters whose type matches. For example you can only connect a `vtkMRMLScalarVolumeNode` to a `vtkMRMLScalarVolumeNode` or a `float` to a `float`. You can also only connect parameters that are _upstream_ of the parameter you are connecting to. For example you can connect a parameter in step 2 to a parameter in step 1, but not the other way around. The popup window will only show you the parameters that are available for you to connect to. If you don't see any you can always add another input parameter.
 
-While all intermediate pipeline parameters have a fixed type input parameters won't have a type until they are connected to another parameters in the pipeline.
+While all intermediate pipeline parameters have a fixed type input parameters won't have a type until they are connected to another parameters in the pipeline. They will then take on the type of the parameter they are connected to.
 
 In the example below you can see a configured pipeline, with two input parameters (a node and a scalar) and on output parameter (a node). In _Step 1_ the scale operation, the `scaleZ` parameter is fixed to 1.
 
 | ![Fully Configure pipeline](Images/creator_full_pipeline.png) |
 | :--: |
 | _Fully filled pipeline_ |
+
+> [!NOTE]
+> In addition to the type, parameters may also carry annotations that inform the user interface (e.g. default values, or ranges, see above image), the annotations for an input parameter will come from the _first_ parameter that it is connected to. Annotations from subsequent connections will be ignored. If you want to preserve all annotations it is probably best in that case to use a separate input parameter
 
 ### Testing and Creating
 
@@ -95,7 +96,13 @@ When you are happy with your pipeline use the _Generate Pipeline_ button to crea
 
 To add a pipeline to your extension or wrap specific slicer functionality in a pipeline you can use the `@slicerPipeline` decorator. This decorator registers the function as a pipeline, after that it can be used in the Pipeline Creator.
 
-The `@slicerPipeline` decorator looks like this `@slicerPipeline(name=None, dependencies=None, categories=None)` with `name` being the name of the pipeline that you are trying to register. `dependencies` being a list of other modules that this pipeline depends on and `categories` being a list of categories that this pipeline belongs to. If `dependencies` does not contain all the modules that are needed by the code that you are writing the code generated that uses this pipeline may not run correctly as the appropriate `import` statement will not be generated. The `PipelineModules` directory in the SlicerPipelines modules contains a number of examples of pipelines that are registered in source.
+The `@slicerPipeline` decorator looks has the following parameters `@slicerPipeline(name=None, dependencies=None, categories=None)` with
+
+- `name` being the name of the pipeline that you are trying to register, this parameter is required.
+- `dependencies` being a list of other modules that this pipeline depends on
+- `categories` being a list of categories that this pipeline belongs to.
+
+If `dependencies` does not contain all the modules that are needed by the code that you are writing (in most cases that is at least the module that you are extending) the code generated that uses this pipeline may not run correctly as the appropriate `import` statement will not be generated. The `PipelineModules` directory in the SlicerPipelines modules contains a number of examples of pipelines that are registered in source.
 
 For example:
 
@@ -115,18 +122,13 @@ Slicer pipelines uses the python [type system](https://docs.python.org/3/library
 Additionally you can use functionality from [ParameterNodeWrapper](https://github.com/Slicer/Slicer/tree/main/Base/Python/slicer/parameterNodeWrapper) library inside of slicer to augment the UI that will be created for your pipeline.
 
 ```python
-@slicerPipeline(name="SurfaceToolbox.ScaleMesh", dependencies=_surfaceToolboxDeps, categories=_surfaceToolboxCats)
-def scaleMesh(mesh: vtkMRMLModelNode,
-              scaleX: Annotated[float, Minimum(0)],
-              scaleY: Annotated[float, Minimum(0)],
-              scaleZ: Annotated[float, Minimum(0)]) -> vtkMRMLModelNode:
-
-    return _surfaceToolboxRun(mesh, "scale", {
-        "scaleX": str(scaleX),
-        "scaleY": str(scaleY),
-        "scaleZ": str(scaleZ),
-    })
+@slicerPipeline(name="vtkFillHoles", categories=["VTK"])
+def fillHoles(mesh: slicer.vtkMRMLModelNode,
+              holeSize: Annotated[float, WithinRange(0, 1000), Default(1000), Decimals(2), SingleStep(0.1)]) -> slicer.vtkMRMLModelNode:
+    return vtkPolyDataPipelineImpl(vtk.vtkFillHolesFilter(),
+                                   mesh,
+                                   HoleSize=holeSize)
 ```
 
-In this case the UI will not accept values less than 0 for the scale parameters. These can be found in [validators.py](https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/parameterNodeWrapper/validators.py)
+In this case the UI will generate a slider for the range [0, 1000] with the value set to 1000. More information on the annotations can be found in [validators.py](https://github.com/Slicer/Slicer/blob/main/Base/Python/slicer/parameterNodeWrapper/validators.py)
 

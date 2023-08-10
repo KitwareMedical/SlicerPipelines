@@ -24,15 +24,17 @@ Once you have set the output directory you are ready to run the pipeline. The ou
 
 ### CSV File
 
-The input `.csv` file should contain a header row with the names of the parameters in the respective column. If you are unsure you can use the _Create Template Parameter File_ button to create a stub `.csv` file with the appropriate headers. The file created via the button will not only name the paramter for the column but will also include the type of the respective parameter in the form `<name>:<type>`. The type is informational and not required when you label your own `.csv` file.
+The input `.csv` file should contain a header row with the names of the parameters in the respective column. If you are unsure you can use the _Create Template Parameter File_ button to create a stub `.csv` file with the appropriate headers. The file created via the button will not only name the parameter for the column but will also include the type of the respective parameter in the form `<name>:<type>`. The type is informational and not required when you label your own `.csv` file.
 
 For any type except node types all you need to do is to fill in the values for the parameters in the respective columns. For node types you need to provide a path to the file containing the node. The path can be either absolute or relative to the location of the `.csv` file.
 
 ## Running a pipeline
 
-Pushing _Run_ will begin executing the pipeline on each row of the `.csv` file. To do this a new instance of slicer will be created to provide a clean environement for running the pipeline. The progress of the pipeline will be displayed in the _Overall Progress_ bar. Each full bar indicates one case being completed and the text in the bar will show `<current case>/<total cases>`. Calculation can be stopped by using the _Cancel_ button.
+Pushing _Run_ will begin executing the pipeline on each row of the `.csv` file. To do this a new instance of slicer will be created to provide a clean environment for running the pipeline. The progress of the pipeline will be displayed in the _Overall Progress_ bar. Each full bar indicates one case being completed and the text in the bar will show `<current case>/<total cases>`. Calculation can be stopped by using the _Cancel_ button.
 
 Note that for each row, every column needs to be filled out for the case to run. The iterator will emit an error and skip a row if there are issues with parsing a value or loading a file the. The resulting output will only contain the cases that were run.
+
+Run will be disabled until you've picked a pipeline, the input file is set *and* valid for the pipeline, and the output directory is set.
 
 Any resulting node data will be stored in the output directory, all resulting scalars will be stored in the `.csv` file in the output directory (including paths to the appropriate files for each case)
 
