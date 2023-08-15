@@ -352,6 +352,7 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
             parameters = IteratorParameterFile(pipelineInfo.parameters)
             self.ui.inputFileLineEdit.text = filePicker.selectedFiles()[0]
             parameters.createTemplate(self.ui.inputFileLineEdit.text)
+            self._validateInputs()
 
     def browseOutputDirectory(self):
         directoryPicker = qt.QFileDialog(self.parent, "Choose output directory", self._browseDirectory)

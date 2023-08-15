@@ -2,6 +2,7 @@ import csv
 import typing
 from copy import copy
 
+from slicer.parameterNodeWrapper import unannotatedType
 
 class _IteratorParameterFileIterator(object):
     """
@@ -34,7 +35,7 @@ class IteratorParameterFile(object):
                  ignores: list[str] = ['delete_intermediate_nodes']) -> None:
         self._inputs = inputs
         self._ignores = ignores
-        self._headers = [f"{key}:{value.__name__}" for key, value in self._inputs.items() if key not in ignores]
+        self._headers = [f"{key}:{unannotatedType(value).__name__}" for key, value in self._inputs.items() if key not in ignores]
         self._rows: list[dict[str, str]] = []
 
         if inputFile is not None:
