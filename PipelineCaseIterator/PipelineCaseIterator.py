@@ -39,15 +39,16 @@ def rowToTypes(csvRow: dict[str, str], inputTypes: dict[str, typing.Any], baseDi
         csvRow (dict[str, str]): The row from the csv file
         inputTypes (dict[str, typing.Any]): The types of the input parameters from the pipelineInfo
     Returns:
+        valid (bool): True iff all files were loaded and of the correct type
         data (dict[str, typing.Any]): The data converted to the ingoing types, None on conversion error
-        nodes (list[slicer.vtkMRMLNode]): The nodes that were created, None on conversion error
+        nodes (list[slicer.vtkMRMLNode]): The nodes that were created, empty list on conversion error
     """
     parameters = {}
     nodes = []
     valid = True
 
     if baseDirectory == '':
-        baseDirectory = os.curdir()
+        baseDirectory = os.getcwd()
 
     for name, paramType in inputTypes.items():
         if name == "delete_intermediate_nodes":

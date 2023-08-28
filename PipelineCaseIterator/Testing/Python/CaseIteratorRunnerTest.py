@@ -23,7 +23,8 @@ class RowToTypesTest(unittest.TestCase):
     def testSimpleRowToTypes(self):
         row = {"a": "1", "b": "2", "node": self.testFileName }
         types = {"a": str, "b": int, "node": slicer.vtkMRMLScalarVolumeNode }
-        data, nodes = rowToTypes(row, types)
+        valid, data, nodes = rowToTypes(row, types)
+        self.assertTrue(valid)
         self.assertEquals(data["a"], "1")
         self.assertEquals(data["b"], 2)
         self.assertEquals(len(nodes), 1)
@@ -33,18 +34,20 @@ class RowToTypesTest(unittest.TestCase):
     def testConversionError(self):
         row = {"a": "1", "b": "this is no int", "node": self.testFileName }
         types = {"a": str, "b": int, "node": slicer.vtkMRMLScalarVolumeNode }
-        data, nodes = rowToTypes(row, types)
+        valid, data, nodes = rowToTypes(row, types)
+        self.assertFalse(valid)
         self.assertEquals(data, None)
-        self.assertEquals(nodes, None)
+        self.assertEquals(nodes, [])
         nodeCount = slicer.mrmlScene.GetNodesByClass('vtkMRMLScalarVolumeNode').GetNumberOfItems()
         self.assertEquals(nodeCount, 0)
 
     def testLoadingError(self):
         row = {"a": "1", "b": "2", "node": "filedoesnotexist.nrrd" }
         types = {"a": str, "b": int, "node": slicer.vtkMRMLScalarVolumeNode }
-        data, nodes = rowToTypes(row, types)
+        valid, data, nodes = rowToTypes(row, types)
+        self.assertFalse(valid)
         self.assertEquals(data, None)
-        self.assertEquals(nodes, None)
+        self.assertEquals(nodes, [])
         nodeCount = slicer.mrmlScene.GetNodesByClass('vtkMRMLScalarVolumeNode').GetNumberOfItems()
         self.assertEquals(nodeCount, 0)
 
