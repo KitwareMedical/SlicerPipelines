@@ -4,6 +4,7 @@ set(MODULE_NAME PipelineCaseIterator)
 #-----------------------------------------------------------------------------
 set(MODULE_PYTHON_SCRIPTS
   ${MODULE_NAME}.py
+  PipelineCaseIteratorLibrary/__init__.py
   PipelineCaseIteratorLibrary/Asynchrony.py
   PipelineCaseIteratorLibrary/IteratorParameterFile.py
   PipelineCaseIteratorLibrary/Util.py
