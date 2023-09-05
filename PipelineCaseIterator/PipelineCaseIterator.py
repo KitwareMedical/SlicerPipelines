@@ -20,8 +20,12 @@ import vtk, qt, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
 from PipelineCreator import PipelineCreatorLogic, PipelineProgressCallback
-from PipelineCaseIteratorLibrary import *
-
+from PipelineCaseIteratorLibrary import (
+ Asynchrony,
+ IteratorParameterFile,
+ ScopedNode,
+ ScopedDefaultStorageNode
+)
 
 # overall - int 0-100 with current overall progress
 # currentPipeline - int 0-100 with progress of currently running pipeline
@@ -475,12 +479,17 @@ class PipelineCaseIteratorWidget(ScriptedLoadableModuleWidget, VTKObservationMix
     """
         self.removeObservers()
 
-        settings = qt.QSettings()
-        settings.setValue('PipelineCaseIterator/LastInputFile', self.ui.inputFileLineEdit.text)
-        settings.setValue('PipelineCaseIterator/LastOutputDirectory', self.ui.outputDirectoryLineEdit.text)
-        settings.setValue('PipelineCaseIterator/LastPipelineName', self.ui.pipelineNameLabel.text)
-        settings.setValue('PipelineCaseIterator/LastResultsFileName', self.ui.resultsFileNameLabel.text)
+        self._safeSetValue('PipelineCaseIterator/LastInputFile', self.ui.inputFileLineEdit)
+        self._safeSetValue('PipelineCaseIterator/LastOutputDirectory', self.ui.outputDirectoryLineEdit)
+        self._safeSetValue('PipelineCaseIterator/LastPipelineName', self.ui.pipelineNameLabel)
+        self._safeSetValue('PipelineCaseIterator/LastResultsFileName', self.ui.resultsFileNameLineEdit)
 
+    def _safeSetValue(self, settingsLabel, widget):
+        if not widget:
+            return
+
+        settings = qt.QSettings()
+        settings.setValue(settingsLabel, widget.text)
 
 class CaseIteratorSubProcessError(Exception):
     pass
