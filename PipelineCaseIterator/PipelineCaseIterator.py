@@ -57,6 +57,10 @@ def rowToTypes(csvRow: dict[str, str], inputTypes: dict[str, typing.Any], baseDi
     for name, paramType in inputTypes.items():
         if name == "delete_intermediate_nodes":
             continue
+
+        # Convert annotation instance to unadorned class type
+        paramType = unannotatedType(paramType)
+
         # Verify if
         if issubclass(paramType, slicer.vtkMRMLNode):
             inputNode = slicer.mrmlScene.AddNewNodeByClass(paramType.__name__)
@@ -161,7 +165,10 @@ class PipelineCaseIteratorRunner(object):
                 traceback.print_exc()
             finally:
                 for node in inputNodes:
-                    slicer.mrmlScene.RemoveNode(node)
+                    id = node.GetID()
+                    found = slicer.mrmlScene.GetNodeByID(id)
+                    if found:
+                        slicer.mrmlScene.RemoveNode(found)
 
         self._writeResults(outputData, self._outputDirectory)
 
